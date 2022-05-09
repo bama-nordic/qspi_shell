@@ -105,6 +105,8 @@ class WiFiUtilsClient():
 
     def memtest(self,addr,pattern,incr,wrd_len):
         self.execute_command(f'wifiutils memtest  {addr} {pattern} {incr} {wrd_len}')
+        time.sleep(2)
+        #rx = self.read().decode()
         rx = self.read().decode().split("\r\n")[-2]
         print(rx)
 
@@ -114,10 +116,24 @@ if __name__ == '__main__':
 
     myser =  WiFiUtilsClient()
     status = myser.connect()
-    myser.write_blk(0x0c0000, 0xaabbccdd, 0, 16)
-    myser.read_blk(0x0c0000, 16)
-    myser.memtest(0x0c0000, 0x0, 0x1, 64)
-    myser.read_blk(0x0c0000,64)
+
+    print("Starting PKTRAM tests")
+    myser.memtest(0x0c0000,0,1,50176) #  (PKTRAM)
+
+    #print("Starting GRAM tests")
+    #myser.memtest(0x080000,0,1,18432) #  (GRAM)
+
+    #print("Starting LMAC_RET_RAM tests")
+    #myser.memtest(0x140000,0,1,12288) #  (LMAC_RET_RAM)
+
+    #print("Starting LMAC_SCR_RAM tests")
+    #myser.memtest(0x180000,0,1,16384) #  (LMAC_SCR_RAM)
+
+    #print("Starting UMAC_RET_RAM tests")
+    #myser.memtest(0x280000,0,1,36864) #  (UMAC_RET_RAM)
+
+    #print("Starting UMAC_SCR_RAM tests")
+    #myser.memtest(0x300000,0,1,57344) #  (UMAC_SCR_RAM)
 
     myser.close()
 

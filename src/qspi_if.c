@@ -1308,10 +1308,13 @@ int qspi_init(struct qspi_config *config)
 	config->writeoc = config->quad_spi ? NRF_QSPI_WRITEOC_PP4IO : NRF_QSPI_WRITEOC_PP;
 
 	rc = qspi_nor_init(&qspi_perip);
+	//printk("exited qspi_nor_init()\n");
 
 	qspi_cmd_wakeup_rpu(&qspi_perip);
+	printk("exited qspi_cmd_wakeup_rpu(). Waiting for rpu_awake.....\n");
 
 	qspi_wait_while_rpu_awake(&qspi_perip);
+	//printk("exited qspi_wait_while_rpu_awake()\n");
 
 	k_sem_init(&qspi_config->lock, 1, 1);
 
@@ -1329,6 +1332,7 @@ int qspi_init(struct qspi_config *config)
 			config->enc_enabled = true;
 	}
 #endif
+	printk("exiting qspi_init\n");
 	return rc;
 }
 

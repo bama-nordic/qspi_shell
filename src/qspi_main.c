@@ -394,6 +394,9 @@ static void cmd_help(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "uart:~$ wifiutils wifi_off ");
     shell_print(shell, "         This writes 0 to IOVDD Control (P0.31) and then writes 0 to BUCKEN Control (P0.12)"); 
     shell_print(shell, "  "); 
+    shell_print(shell, "uart:~$ wifiutils help ");
+    shell_print(shell, "         Lists all commands with usage example(s) "); 
+    shell_print(shell, "  "); 
 }
 
 /* Creating subcommands (level 1 command) array for command "demo". */
@@ -439,18 +442,22 @@ void main(void)
         return;
     }
 
-#if 1
     printk("GPIO configuration done...\n\n");
+
+
+    gpio_pin_set(gpio_dev, PIN_IOVDD, 0); // IOVDD CNTRL = 0
+    k_msleep(SLEEP_TIME_MS);
+    gpio_pin_set(gpio_dev, PIN_BUCKEN, 0); // BUCKEN = 0
+    k_msleep(SLEEP_TIME_MS);
 
     gpio_pin_set(gpio_dev, PIN_BUCKEN, 1); // Assert BUCKEN
     k_msleep(SLEEP_TIME_MS);
-    printk("\nBUCKEN Asserted...\n");
     gpio_pin_set(gpio_dev, PIN_IOVDD, 1); // IOVDD CNTRL = 1
 
+    printk("\nBUCKEN Asserted...\n");
     printk("Enabled IOVDD...\n\n");
 
     printk("Check voltage on PWRIOVDD on Shelaik chip to confirm Sheliak is powered ON\n\n");
-#endif
 
 #endif
 
@@ -463,7 +470,7 @@ void main(void)
 
     // Enable RPU Clocks
     qdev->write(0x048C20 , &rpu_clks, 4); //write(addr, &data, len)
-
+    
 #endif
 
 } /* main() */
