@@ -1450,3 +1450,54 @@ int qspi_hl_read(unsigned int addr, void *data, int len)
 
 	return 0;
 }
+
+int qspi_cmd_sleep_rpu(const struct device *dev)
+{
+      uint8_t data = 0x0;
+
+      //printf("TODO : %s: \n", __func__);
+      const struct qspi_buf tx_buf = {
+          .buf = &data,
+          .len = sizeof(data),
+      };
+
+      const struct qspi_cmd cmd = {
+          .op_code = 0x3f, // 0x3f, //WRSR2(0x3F) WakeUP RPU.
+          .tx_buf = &tx_buf,
+      };
+
+      int ret = ANOMALY_122_INIT(dev);
+
+      if (ret == 0)
+      {
+          ret = qspi_send_cmd(dev, &cmd, false);
+      }
+
+      ANOMALY_122_UNINIT(dev);
+
+      if (ret < 0)
+      {
+          printk("cmd_wakeup RPU failed: %d \n", ret);
+      }
+
+      return ret;
+}
+
+void get_sleep_stats(void)
+{
+    uint32_t val, status;
+    qspi_cmd_wakeup_rpu(&qspi_perip);
+    printk("Waiting for RPU awake...\n", val);
+    status = qspi_wait_while_rpu_awake(&qspi_perip);
+    //qspi_read(0x080d58, &val, 4); //0xb7000d58
+    printk("RPU awake...\n", val);
+    qspi_read(0x091000, &val, 4); //0xb7000d58
+    printk("Counter : 0x%x \n", val);
+    qspi_read(0x091004, &val, 4); //0xb7000d58
+    printk("Counter : 0x%x \n", val);
+    qspi_read(0x091008, &val, 4); //0xb7000d58
+    printk("Counter : 0x%x \n", val);
+    qspi_read(0x09100c, &val, 4); //0xb7000d58
+    printk("Counter : 0x%x \n", val);
+    qspi_cmd_sleep_rpu(&qspi_perip);
+}

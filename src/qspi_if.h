@@ -93,6 +93,9 @@ struct qspi_config *qspi_defconfig(void);
 //struct qspi_dev *qspi_dev(bool qspi_flag);
 struct qspi_dev *qspi_dev(void);
 
+int qspi_cmd_sleep_rpu(const struct device *dev);
+
 void hard_reset(void);
+void get_sleep_stats(void);
 
 #endif /* __QSPI_IF_H__ */

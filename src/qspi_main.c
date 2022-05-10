@@ -19,7 +19,7 @@
 #include "spi_if.h"
 
 #define SHELIAK_SOC     1
-#define SLEEP_TIME_MS   2
+#define SLEEP_TIME_MS   10
 #define PIN_BUCKEN      12  //P0.12
 #define PIN_IOVDD       31  //P0.31
 
@@ -248,13 +248,6 @@ static int cmd_memtest(const struct shell *shell, size_t argc, char **argv)
     offset = strtoul(argv[3], NULL, 0);
     num_words = strtoul(argv[4], NULL, 0);
 
-#if 0
-    if (num_words > 2000) {
-        shell_print(shell, "Presently supporting block read/write only upto 2000 32-bit words");
-        return -1;
-    }
-#endif
-
     if (!validate_addr(addr, num_words*4)) return -1;
 
     if ((selected_blk == 4) || (selected_blk == 7)) {
@@ -298,29 +291,63 @@ static int cmd_memtest(const struct shell *shell, size_t argc, char **argv)
 }
 
 
+static int cmd_sleep_stats(const struct shell *shell, size_t argc, char **argv)
+{
+   get_sleep_stats(); 
+
+   return 0;
+}
+
 static int cmd_wifi_on(const struct shell *shell, size_t argc, char **argv)
 {
 
-#if SHELIAK_SOC 
     struct qspi_config *cfg;
     uint32_t rpu_clks = 0x100;
 
-    cfg = qspi_defconfig();
-    qdev = qspi_dev(); // QSPI
+#if SHELIAK_SOC 
+    int ret;
+
+    gpio_dev = device_get_binding("GPIO_0");
+    if (gpio_dev == NULL) {
+        return -1;
+    }
+
+    //Put P0.12 to highest drive mode E0E1
+    ret = gpio_pin_configure(gpio_dev, PIN_BUCKEN, GPIO_OUTPUT|(GPIO_PIN_CNF_DRIVE_E0E1 << GPIO_PIN_CNF_DRIVE_Pos));
+    if (ret < 0) {
+        return -1;
+    }
+
+    ret = gpio_pin_configure(gpio_dev, PIN_IOVDD, GPIO_OUTPUT);
+    if (ret < 0) {
+        return -1;
+    }
+
+    printk("GPIO configuration done...\n\n");
 
     gpio_pin_set(gpio_dev, PIN_BUCKEN, 1); // BUCKEN = 1
     k_msleep(SLEEP_TIME_MS);
     gpio_pin_set(gpio_dev, PIN_IOVDD, 1); // IOVDD CNTRL = 1
 
-    shell_print(shell, "Enabled BUCKEN...");
-    shell_print(shell, "Enabled IOVDD...");
+    printk("\nBUCKEN Asserted...\n");
+    printk("Enabled IOVDD...\n\n");
+    printk("Check voltage on PWRIOVDD on Shelaik chip to confirm Sheliak is powered ON\n\n");
+
+    cfg = qspi_defconfig();
+    qdev = qspi_dev(); // QSPI
 
     qdev->init(cfg);
 
     // Enable RPU Clocks
     qdev->write(0x048C20 , &rpu_clks, 4); //write(addr, &data, len)
 #else
-    shell_print(shell, "Wi-Fi ON is not implemented for FPGA");
+    cfg = qspi_defconfig();
+    qdev = qspi_dev(); // QSPI
+
+    qdev->init(cfg);
+
+    // Enable RPU Clocks
+    qdev->write(0x048C20 , &rpu_clks, 4); //write(addr, &data, len)
 #endif
 
     return 0;
@@ -335,7 +362,6 @@ static int cmd_wifi_off(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "Disabled IOVDD...");
     shell_print(shell, "Disabled BUCKEN...");
 #else
-    shell_print(shell, "Wi-Fi OFF is not implemented for FPGA");
 #endif
 
     return 0;
@@ -409,6 +435,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_wifiutils,
         SHELL_CMD(read_wrd,   NULL, "Reads a word from Sheliak host memory via QSPI interface", cmd_read_wrd),
         SHELL_CMD(wifi_on,   NULL, "BUCKEN-IOVDD power ON", cmd_wifi_on),
         SHELL_CMD(wifi_off,   NULL, "BUCKEN-IOVDD power OFF", cmd_wifi_off),
+        SHELL_CMD(sleep_stats,   NULL, "Gives the full memory map of the Sheliak chip", cmd_sleep_stats),
         SHELL_CMD(memmap,   NULL, "Gives the full memory map of the Sheliak chip", cmd_memmap),
         SHELL_CMD(memtest,  NULL, "Writes, reads back and validates specified memory on Seliak chip", cmd_memtest),
         SHELL_CMD(help,   NULL, "Help with all supported commmands", cmd_help),
@@ -421,56 +448,6 @@ SHELL_CMD_REGISTER(wifiutils, &sub_wifiutils, "wifiutils commands", NULL);
 
 void main(void)
 {
-    struct qspi_config *cfg;
-    uint32_t rpu_clks = 0x100;
 
-#if SHELIAK_SOC
-    int ret;
-
-    gpio_dev = device_get_binding("GPIO_0");
-    if (gpio_dev == NULL) {
-        return;
-    }
-
-    ret = gpio_pin_configure(gpio_dev, PIN_BUCKEN, GPIO_OUTPUT);
-    if (ret < 0) {
-        return;
-    }
-
-    ret = gpio_pin_configure(gpio_dev, PIN_IOVDD, GPIO_OUTPUT);
-    if (ret < 0) {
-        return;
-    }
-
-    printk("GPIO configuration done...\n\n");
-
-
-    gpio_pin_set(gpio_dev, PIN_IOVDD, 0); // IOVDD CNTRL = 0
-    k_msleep(SLEEP_TIME_MS);
-    gpio_pin_set(gpio_dev, PIN_BUCKEN, 0); // BUCKEN = 0
-    k_msleep(SLEEP_TIME_MS);
-
-    gpio_pin_set(gpio_dev, PIN_BUCKEN, 1); // Assert BUCKEN
-    k_msleep(SLEEP_TIME_MS);
-    gpio_pin_set(gpio_dev, PIN_IOVDD, 1); // IOVDD CNTRL = 1
-
-    printk("\nBUCKEN Asserted...\n");
-    printk("Enabled IOVDD...\n\n");
-
-    printk("Check voltage on PWRIOVDD on Shelaik chip to confirm Sheliak is powered ON\n\n");
-
-#endif
-
-#if 1
-    cfg = qspi_defconfig();
-
-    qdev = qspi_dev(); // QSPI
-
-    qdev->init(cfg);
-
-    // Enable RPU Clocks
-    qdev->write(0x048C20 , &rpu_clks, 4); //write(addr, &data, len)
-    
-#endif
-
+    printk("\nWelcome to wifiutils shell for interactive debug with Sheliak SoC via QSPI interface\n");
 } /* main() */
