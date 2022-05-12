@@ -293,9 +293,29 @@ static int cmd_memtest(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_sleep_stats(const struct shell *shell, size_t argc, char **argv)
 {
-   get_sleep_stats(); 
 
-   return 0;
+    uint32_t addr;
+    uint32_t wrd_len;
+    uint32_t *buff;
+
+    addr = strtoul(argv[1], NULL, 0);
+    wrd_len = strtoul(argv[2], NULL, 0);
+
+    if (!validate_addr(addr, wrd_len*4)) return -1;
+
+    if ((selected_blk == 4) || (selected_blk == 7)) {
+        shell_print(shell, "Error... Cannot write to ROM blocks");
+    }
+
+    buff = (uint32_t *) k_malloc(wrd_len*4);
+    get_sleep_stats(addr, buff, wrd_len); 
+
+    for (int i=0; i<wrd_len; i++) {
+        printk("0x%08x\n", buff[i]);
+    }
+
+    k_free(buff);
+    return 0;
 }
 
 static int cmd_wifi_on(const struct shell *shell, size_t argc, char **argv)
@@ -305,15 +325,19 @@ static int cmd_wifi_on(const struct shell *shell, size_t argc, char **argv)
     uint32_t rpu_clks = 0x100;
 
 #if SHELIAK_SOC 
+
     int ret;
+
+    cfg = qspi_defconfig();
+    qdev = qspi_dev(); // QSPI
 
     gpio_dev = device_get_binding("GPIO_0");
     if (gpio_dev == NULL) {
         return -1;
     }
 
-    //Put P0.12 to highest drive mode E0E1
-    ret = gpio_pin_configure(gpio_dev, PIN_BUCKEN, GPIO_OUTPUT|(GPIO_PIN_CNF_DRIVE_E0E1 << GPIO_PIN_CNF_DRIVE_Pos));
+    //Put P0.12 to highest drive mode H0H1 or E0E1
+    ret = gpio_pin_configure(gpio_dev, PIN_BUCKEN, GPIO_OUTPUT|(GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos));
     if (ret < 0) {
         return -1;
     }
@@ -325,6 +349,14 @@ static int cmd_wifi_on(const struct shell *shell, size_t argc, char **argv)
 
     printk("GPIO configuration done...\n\n");
 
+    int count = 0;
+    do {
+	    count++;
+    gpio_pin_set(gpio_dev, PIN_BUCKEN, 0); // BUCKEN = 1
+    k_msleep(SLEEP_TIME_MS);
+    gpio_pin_set(gpio_dev, PIN_IOVDD, 0); // IOVDD CNTRL = 1
+    k_msleep(100);
+
     gpio_pin_set(gpio_dev, PIN_BUCKEN, 1); // BUCKEN = 1
     k_msleep(SLEEP_TIME_MS);
     gpio_pin_set(gpio_dev, PIN_IOVDD, 1); // IOVDD CNTRL = 1
@@ -333,10 +365,9 @@ static int cmd_wifi_on(const struct shell *shell, size_t argc, char **argv)
     printk("Enabled IOVDD...\n\n");
     printk("Check voltage on PWRIOVDD on Shelaik chip to confirm Sheliak is powered ON\n\n");
 
-    cfg = qspi_defconfig();
-    qdev = qspi_dev(); // QSPI
+    if (count == 50) break;
 
-    qdev->init(cfg);
+    } while (qdev->init(cfg)!= 0x2);
 
     // Enable RPU Clocks
     qdev->write(0x048C20 , &rpu_clks, 4); //write(addr, &data, len)
