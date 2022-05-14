@@ -18,10 +18,17 @@
 #include "qspi_if.h"
 #include "spi_if.h"
 
-#define SHELIAK_SOC     1
-#define SLEEP_TIME_MS   10
+#define SHELIAK_SOC      1  // 0 for FPGA builds
+#define SLEEP_TIME_MS    5
 #define PIN_BUCKEN      12  //P0.12
 #define PIN_IOVDD       31  //P0.31
+
+#if SHELIAK_SOC
+    #define PIN_IRQ     23  //P0.23 on SoC
+#else
+    #define PIN_IRQ     24  //P0.24 on FPGA
+#endif
+
 
 extern struct qspi_config *qspi_config;
 const struct qspi_dev *qdev;
@@ -42,6 +49,12 @@ static uint32_t shk_memmap[][2] = {
     {0x280000, 0x2A4000}, //8 UMAC_RET_RAM
     {0x300000, 0x338000}  //9 UMAC_SCR_RAM
 };
+
+struct gpio_callback irq_callback_data;
+
+void irq_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
+    printk("\n\n IRQ Hit !!!!\n\n");
+}
 
 void print_memmap()
 {
@@ -308,6 +321,7 @@ static int cmd_sleep_stats(const struct shell *shell, size_t argc, char **argv)
     }
 
     buff = (uint32_t *) k_malloc(wrd_len*4);
+
     get_sleep_stats(addr, buff, wrd_len); 
 
     for (int i=0; i<wrd_len; i++) {
@@ -318,18 +332,12 @@ static int cmd_sleep_stats(const struct shell *shell, size_t argc, char **argv)
     return 0;
 }
 
-static int cmd_wifi_on(const struct shell *shell, size_t argc, char **argv)
+//--------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------
+static int func_gpio_config()
 {
 
-    struct qspi_config *cfg;
-    uint32_t rpu_clks = 0x100;
-
-#if SHELIAK_SOC 
-
     int ret;
-
-    cfg = qspi_defconfig();
-    qdev = qspi_dev(); // QSPI
 
     gpio_dev = device_get_binding("GPIO_0");
     if (gpio_dev == NULL) {
@@ -347,56 +355,208 @@ static int cmd_wifi_on(const struct shell *shell, size_t argc, char **argv)
         return -1;
     }
 
+    //ret = gpio_pin_configure(gpio_dev, PIN_IRQ, (GPIO_INPUT | GPIO_INT_EDGE_TO_ACTIVE | GPIO_INT_DEBOUNCE));
+    ret = gpio_pin_configure(gpio_dev, PIN_IRQ, (GPIO_INPUT | GPIO_INT_EDGE_TO_ACTIVE));
+    if (ret < 0) {
+        return -1;
+    }
+
+    //ret = gpio_pin_interrupt_configure(gpio_dev, PIN_IRQ, (GPIO_INT_EDGE_TO_ACTIVE | GPIO_INT_DEBOUNCE));
+    ret = gpio_pin_interrupt_configure(gpio_dev, PIN_IRQ, (GPIO_INT_EDGE_TO_ACTIVE));
+    if (ret < 0) {
+        return -1;
+    }
+
+    gpio_init_callback(&irq_callback_data, irq_handler,BIT(PIN_IRQ));
+    gpio_add_callback(gpio_dev, &irq_callback_data);
+
+    printk("Finished Interrupt config\n\n");
+
     printk("GPIO configuration done...\n\n");
 
-    int count = 0;
-    do {
-	    count++;
-    gpio_pin_set(gpio_dev, PIN_BUCKEN, 0); // BUCKEN = 1
+    return 0;
+}
+
+static int cmd_gpio_config(const struct shell *shell, size_t argc, char **argv)
+{
+    int ret;
+
+    ret = func_gpio_config();
+    return ret;
+}
+
+//--------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------
+static int func_pwron(void)
+{
+
+#if SHELIAK_SOC
+    gpio_pin_set(gpio_dev, PIN_BUCKEN, 1);
     k_msleep(SLEEP_TIME_MS);
-    gpio_pin_set(gpio_dev, PIN_IOVDD, 0); // IOVDD CNTRL = 1
-    k_msleep(100);
-
-    gpio_pin_set(gpio_dev, PIN_BUCKEN, 1); // BUCKEN = 1
-    k_msleep(SLEEP_TIME_MS);
-    gpio_pin_set(gpio_dev, PIN_IOVDD, 1); // IOVDD CNTRL = 1
-
-    printk("\nBUCKEN Asserted...\n");
-    printk("Enabled IOVDD...\n\n");
-    printk("Check voltage on PWRIOVDD on Shelaik chip to confirm Sheliak is powered ON\n\n");
-
-    if (count == 50) break;
-
-    } while (qdev->init(cfg)!= 0x2);
-
-    // Enable RPU Clocks
-    qdev->write(0x048C20 , &rpu_clks, 4); //write(addr, &data, len)
+    gpio_pin_set(gpio_dev, PIN_IOVDD, 1);
+    printk("BUCKEN=1, IOVDD=1...\n");
 #else
-    cfg = qspi_defconfig();
-    qdev = qspi_dev(); // QSPI
-
-    qdev->init(cfg);
-
-    // Enable RPU Clocks
-    qdev->write(0x048C20 , &rpu_clks, 4); //write(addr, &data, len)
 #endif
 
     return 0;
 }
 
+static int cmd_pwron(const struct shell *shell, size_t argc, char **argv)
+{
+    func_pwron();
+    return 0;
+}
+//--------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------
+
+static int func_qspi_init(void)
+{
+
+#if SHELIAK_SOC
+    struct qspi_config *cfg;
+
+    cfg = qspi_defconfig();
+    qdev = qspi_dev(); // QSPI
+    qdev->init(cfg);
+    printk("QSPI Config done...\n");
+#else
+#endif
+
+    return 0;
+}
+
+static int cmd_qspi_init(const struct shell *shell, size_t argc, char **argv)
+{
+    func_qspi_init();
+    return 0;
+}
+
+//--------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------
+
+static int func_rpuwake(void)
+{
+
+#if SHELIAK_SOC
+    qspi_cmd_wakeup_rpu(&qspi_perip,0x1);
+    printk("exited qspi_cmd_wakeup_rpu()\n");
+
+    qspi_validate_rpu_wake_writecmd(&qspi_perip);
+    printk("exited qspi_validate_rpu_wake_writecmd(). Waiting for rpu_awake.....\n");
+
+    qspi_wait_while_rpu_awake(&qspi_perip);
+
+#else
+#endif
+
+    return 0;
+}
+
+static int cmd_rpuwake(const struct shell *shell, size_t argc, char **argv)
+{
+    func_rpuwake();
+    return 0;
+}
+//--------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------
+
+static int func_wrsr2(uint8_t data)
+{
+    qspi_cmd_wakeup_rpu(&qspi_perip,data);
+    printk("Written 0x%x to WRSR2\n",data);
+    return 0;
+}
+
+static int cmd_wrsr2(const struct shell *shell, size_t argc, char **argv)
+{
+    uint8_t data;
+    data = strtoul(argv[1], NULL, 0) &0xff; //only LSByte
+    func_wrsr2(data);
+    return 0;
+
+}
+
+//--------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------
+static int func_rdsr2(void)
+{
+    qspi_validate_rpu_wake_writecmd(&qspi_perip);
+    return 0;
+}
+
+static int cmd_rdsr2(const struct shell *shell, size_t argc, char **argv)
+{
+    func_rdsr2();
+    return 0;
+}
+//--------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------
+
+static int func_rdsr1(void)
+{
+    qspi_wait_while_rpu_awake(&qspi_perip);
+    return 0;
+}
+
+static int cmd_rdsr1(const struct shell *shell, size_t argc, char **argv)
+{
+    func_rdsr1();
+    return 0;
+}
+
+//--------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------
+
+static int func_rpuclks_on(void)
+{
+    uint32_t rpu_clks = 0x100;
+    // Enable RPU Clocks
+    qdev->write(0x048C20 , &rpu_clks, 4); //write(addr, &data, len)
+    printk("RPU Clocks ON...");
+    return 0;
+}
+
+static int cmd_rpuclks_on(const struct shell *shell, size_t argc, char **argv)
+{
+    func_rpuclks_on();
+    return 0;
+}
+
+
+//--------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------
+static void func_wifi_on()
+{
+    func_gpio_config();
+    func_pwron();
+    func_qspi_init();
+    func_rpuwake();
+    func_rpuclks_on();
+}
+
+static int cmd_wifi_on(const struct shell *shell, size_t argc, char **argv)
+{
+    func_wifi_on();
+    return 0;
+}
+
+
+//--------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------
 static int cmd_wifi_off(const struct shell *shell, size_t argc, char **argv)
 {
 
 #if SHELIAK_SOC
     gpio_pin_set(gpio_dev, PIN_IOVDD, 0); // IOVDD CNTRL = 0
     gpio_pin_set(gpio_dev, PIN_BUCKEN, 0); // BUCKEN = 0
-    shell_print(shell, "Disabled IOVDD...");
-    shell_print(shell, "Disabled BUCKEN...");
+    shell_print(shell, "IOVDD=0, BUCKEN=0...");
 #else
 #endif
 
     return 0;
 }
+//--------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------
 
 static int cmd_memmap(const struct shell *shell, size_t argc, char **argv)
 {
@@ -467,6 +627,14 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_wifiutils,
         SHELL_CMD(wifi_on,   NULL, "BUCKEN-IOVDD power ON", cmd_wifi_on),
         SHELL_CMD(wifi_off,   NULL, "BUCKEN-IOVDD power OFF", cmd_wifi_off),
         SHELL_CMD(sleep_stats,   NULL, "Gives the full memory map of the Sheliak chip", cmd_sleep_stats),
+        SHELL_CMD(gpio_config,   NULL, "Configure all GPIOs", cmd_gpio_config),
+        SHELL_CMD(qspi_init,   NULL, "Initialize QSPI driver functions", cmd_qspi_init),
+        SHELL_CMD(pwron,   NULL, "BUCKEN=1, delay, IOVDD=1", cmd_pwron),
+        SHELL_CMD(rpuwake,   NULL, "Wakeup RPU: Write 0x1 to WRSR2 reg", cmd_rpuwake),
+        SHELL_CMD(rpuclks_on,   NULL, "Enable all RPU gated clocks", cmd_rpuclks_on),
+        SHELL_CMD(wrsr2,   NULL, "Write to WRSR2 register", cmd_wrsr2),
+        SHELL_CMD(rdsr1,   NULL, "Read RDSR1 register", cmd_rdsr1),
+        SHELL_CMD(rdsr2,   NULL, "Read RDSR2 register", cmd_rdsr2),
         SHELL_CMD(memmap,   NULL, "Gives the full memory map of the Sheliak chip", cmd_memmap),
         SHELL_CMD(memtest,  NULL, "Writes, reads back and validates specified memory on Seliak chip", cmd_memtest),
         SHELL_CMD(help,   NULL, "Help with all supported commmands", cmd_help),
@@ -479,6 +647,5 @@ SHELL_CMD_REGISTER(wifiutils, &sub_wifiutils, "wifiutils commands", NULL);
 
 void main(void)
 {
-
     printk("\nWelcome to wifiutils shell for interactive debug with Sheliak SoC via QSPI interface\n");
 } /* main() */

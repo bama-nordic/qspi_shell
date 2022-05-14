@@ -125,8 +125,7 @@ struct qspi_nor_data {
 #endif /* CONFIG_MULTITHREADING */
 };
 
-static int qspi_nor_write_protection_set(const struct device *dev,
-										 bool write_protect);
+static int qspi_nor_write_protection_set(const struct device *dev, bool write_protect);
 
 static inline int qspi_get_mode(bool cpol, bool cpha)
 {
@@ -1218,7 +1217,7 @@ static int qspi_cmd_encryption(const struct device *dev, nrf_qspi_encryption_t *
 #endif
 
 /* Wait until RDSR2 confirms RPU_WAKE write is successful */
-static int qspi_validate_rpu_wake_writecmd(const struct device *dev)
+int qspi_validate_rpu_wake_writecmd(const struct device *dev)
 {
 	int ret = 0;
 	uint8_t sr = 0;
@@ -1232,7 +1231,7 @@ static int qspi_validate_rpu_wake_writecmd(const struct device *dev)
 		.rx_buf = &sr_buf,
 	};
 
-	for (int ii=0; ii<2; ii++) {
+	for (int ii=0; ii<1; ii++) {
           ANOMALY_122_INIT(dev);
 
           ret = qspi_send_cmd(dev, &cmd, false);
@@ -1241,14 +1240,14 @@ static int qspi_validate_rpu_wake_writecmd(const struct device *dev)
 
 	  printk("RDSR2 = 0x%x\n",sr);
 
-	  k_msleep(1);
+	  //k_msleep(1);
         }
 
 	return ret;
 }
 
 /* Wait until RDSR1 confirms RPU_AWAKE/RPU_READY */
-static int qspi_wait_while_rpu_awake(const struct device *dev)
+int qspi_wait_while_rpu_awake(const struct device *dev)
 {
 	int ret = 0;
 	uint8_t sr = 0;
@@ -1274,7 +1273,7 @@ static int qspi_wait_while_rpu_awake(const struct device *dev)
 	} while ((ret < 0) || ((sr & RPU_AWAKE_BIT) == 0));
 #else
 
-	for (int ii = 0; ii<2; ii++) {
+	for (int ii = 0; ii<1; ii++) {
 		int ret ;
 		ret = ANOMALY_122_INIT(dev);
 
@@ -1296,13 +1295,12 @@ static int qspi_wait_while_rpu_awake(const struct device *dev)
 	 
 #endif
 
-	//return ret;
-	return sr;
+	return ret;
 }
 
-int qspi_cmd_wakeup_rpu(const struct device *dev)
+int qspi_cmd_wakeup_rpu(const struct device *dev, uint8_t data)
 {
-	uint8_t data = 0x1;
+	//uint8_t data = 0x1;
 
 	/* printf("TODO : %s:\n", __func__); */
 
@@ -1365,7 +1363,8 @@ int qspi_init(struct qspi_config *config)
 	rc = qspi_nor_init(&qspi_perip);
 	//printk("exited qspi_nor_init()\n");
 
-	qspi_cmd_wakeup_rpu(&qspi_perip);
+#if 0
+	qspi_cmd_wakeup_rpu(&qspi_perip,0x1);
 	printk("exited qspi_cmd_wakeup_rpu()\n");
 
         qspi_validate_rpu_wake_writecmd(&qspi_perip);
@@ -1373,6 +1372,7 @@ int qspi_init(struct qspi_config *config)
 
 	rc = qspi_wait_while_rpu_awake(&qspi_perip);
 	//printk("exited qspi_wait_while_rpu_awake()\n");
+#endif
 
 	k_sem_init(&qspi_config->lock, 1, 1);
 
@@ -1543,9 +1543,9 @@ int qspi_cmd_sleep_rpu(const struct device *dev)
 
 void get_sleep_stats(uint32_t addr, uint32_t *buff, uint32_t wrd_len)
 {
-    uint32_t val, status;
+    uint32_t status;
 
-    qspi_cmd_wakeup_rpu(&qspi_perip);
+    qspi_cmd_wakeup_rpu(&qspi_perip,0x1);
     printk("Waiting for RPU awake...\n");
 
     qspi_validate_rpu_wake_writecmd(&qspi_perip);
@@ -1553,22 +1553,7 @@ void get_sleep_stats(uint32_t addr, uint32_t *buff, uint32_t wrd_len)
 
     status = qspi_wait_while_rpu_awake(&qspi_perip);
     printk("exited qspi_wait_while_rpu_awake()...\n");
-#if 0
-    //qspi_read(0x080d58, &val, 4); //0xb7000d58
-    printk("RPU awake...\n");
-    qspi_read(0x091000, &val, 4); //0xb7000d58
-    printk("Counter : 0x%x \n", val);
-    qspi_read(0x091004, &val, 4); //0xb7000d58
-    printk("Counter : 0x%x \n", val);
-    qspi_read(0x091008, &val, 4); //0xb7000d58
-    printk("Counter : 0x%x \n", val);
-    qspi_read(0x09100c, &val, 4); //0xb7000d58
-    printk("Counter : 0x%x \n", val);
-    qspi_cmd_sleep_rpu(&qspi_perip);
-#else
+
     qspi_read(addr, buff, wrd_len*4);
     qspi_cmd_sleep_rpu(&qspi_perip);
-      
-#endif
-
 }

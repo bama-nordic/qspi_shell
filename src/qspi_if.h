@@ -71,7 +71,7 @@ struct qspi_dev {
 	void (*hard_reset)(void);
 };
 
-int qspi_cmd_wakeup_rpu(const struct device *dev);
+int qspi_cmd_wakeup_rpu(const struct device *dev, uint8_t data);
 
 int qspi_init(struct qspi_config *config);
 
@@ -97,5 +97,9 @@ int qspi_cmd_sleep_rpu(const struct device *dev);
 
 void hard_reset(void);
 void get_sleep_stats(uint32_t addr, uint32_t *buff, uint32_t wrd_len);
+
+extern struct device qspi_perip;
+int qspi_validate_rpu_wake_writecmd(const struct device *dev);
+int qspi_wait_while_rpu_awake(const struct device *dev);
 
 #endif /* __QSPI_IF_H__ */
