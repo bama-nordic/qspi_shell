@@ -76,7 +76,19 @@ uart:~$ wifiutils rdsr1
 uart:~$ wifiutils rdsr2
          
          Reads RDSR2 Register
-
+         
+uart:~$ wifiutils irqen
+         
+         Enable IRQ interrupt to Host
+         
+uart:~$ wifiutils irqdis
+         
+         Clear the generated IRQ reg
+         
+uart:~$ wifiutils ver
+         
+         Display the verion of the driver
+         
 uart:~$ wifiutils help
          
          Lists all commands with usage example(s)
