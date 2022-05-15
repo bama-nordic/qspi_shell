@@ -3,11 +3,11 @@ A (Q)SPI shell for Sheliak test and debug
 
 # Commands supported -
 
-uart:~$ wifiutils read_wrd    <address> 
+uart:~$ wifiutils read_wrd  <address> 
 
          ex: $ wifiutils read_wrd 0x0c0000
   
-uart:~$ wifiutils write_wrd   <address> <data>
+uart:~$ wifiutils write_wrd  <address> <data>
 
          ex: $ wifiutils write_wrd 0x0c0000 0xabcd1234
   
@@ -41,37 +41,47 @@ uart:~$ wifiutils wifi_off
          This writes 0 to IOVDD Control (P0.31) and then writes 0 to BUCKEN Control (P0.12)
 
 uart:~$ wifiutils sleep_stats
+         
          This continuously does the RPU sleep/wake cycle and displays stats
 
 uart:~$ wifiutils gpio_config
+         
          Configures BUCKEN(P0.12) as o/p, IOVDD control (P0.31) as output and HOST_IRQ (P0.23) as input
          and interruptible with a ISR hooked to it
 
 uart:~$ wifiutils qspi_init
+         
          Initializes QSPI driver functions
 
 uart:~$ wifiutils pwron
+         
          Sets BUCKEN=1, delay, IOVDD cntrl=1
 
 uart:~$ wifiutils rpuwake
+         
          Wakeup RPU: Write 0x1 to WRSR2 register
 
 uart:~$ wifiutils rpuclks_on
+         
          Enables all gated RPU clocks. Only SysBUS and PKTRAM will work w/o this setting enabled
 
 uart:~$ wifiutils wrsr2 <val>
+         
          writes <val> (0/1) to WRSR2 reg - takes LSByte of <val>
 
 uart:~$ wifiutils rdsr1
+         
          Reads RDSR1 Register
 
 uart:~$ wifiutils rdsr2
+         
          Reads RDSR2 Register
 
 uart:~$ wifiutils help
+         
          Lists all commands with usage example(s)
 
-#Notes -
+# Notes -
 
 * All addresses accepted by the utility have to be 32-bit word aligned. Non word-aligned addresses will not be accepted.
 * All lengths specified (num_words) are 32-bit word lengths. No support for byte read/write (Where required, the user has to use read-modify-write sequence to implement byte writes)
