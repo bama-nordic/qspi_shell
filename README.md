@@ -11,12 +11,12 @@ uart:~$ wifiutils write_wrd  <address> <data>
 
          ex: $ wifiutils write_wrd 0x0c0000 0xabcd1234
   
-uart:~$ wifiutils read_blk    <address> <num_words>
+uart:~$ wifiutils read_blk <address> <num_words>
 
          ex: $ wifiutils read_blk 0x0c0000 64
          Note - num_words can be a maximum of 2000
   
-uart:~$ wifiutils write_blk   <address> <start_pattern> <pattern_increment> <num_words>
+uart:~$ wifiutils write_blk <address> <start_pattern> <pattern_increment> <num_words>
 
          ex: $ wifiutils write_blk 0x0c0000 0xaaaa5555 0 64
          This writes pattern 0xaaaa5555 to 64 locations starting from 0x0c0000
@@ -26,7 +26,7 @@ uart:~$ wifiutils write_blk   <address> <start_pattern> <pattern_increment> <num
          This writes pattern 0x0, 0x1,0x2,0x3....etc to 64 locations starting from 0x0c0000
          Note - num_words can be a maximum of 2000
   
-uart:~$ wifiutils memtest   <address> <start_pattern> <pattern_increment> <num_words>
+uart:~$ wifiutils memtest  <address> <start_pattern> <pattern_increment> <num_words>
 
          ex: $ wifiutils memtest 0x0c0000 0xaaaa5555 0 64
          This writes pattern 0xaaaa5555 to 64 locations starting from 0x0c0000,
