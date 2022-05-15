@@ -29,7 +29,7 @@
     #define PIN_IRQ     24  //P0.24 on FPGA
 #endif
 
-#define SW_VER          "1.5"
+#define SW_VER          "1.5.1"
 
 extern struct qspi_config *qspi_config;
 const struct qspi_dev *qdev;
@@ -640,6 +640,12 @@ static void cmd_help(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "uart:~$ wifiutils rdsr2 ");
     shell_print(shell, "         Reads RDSR2 Register"); 
     shell_print(shell, "  "); 
+    shell_print(shell, "uart:~$ wifiutils irqen ");
+    shell_print(shell, "         Generates IRQ interrupt to host"); 
+    shell_print(shell, "  "); 
+    shell_print(shell, "uart:~$ wifiutils irqdis ");
+    shell_print(shell, "         Clears host IRQ generated interrupt"); 
+    shell_print(shell, "  "); 
     shell_print(shell, "uart:~$ wifiutils ver ");
     shell_print(shell, "         Display SW version of the hex file "); 
     shell_print(shell, "  "); 
@@ -652,6 +658,36 @@ static int cmd_ver(const struct shell *shell, size_t argc, char **argv)
 {
 
     shell_print(shell, "wifiutils Version: %s",SW_VER); 
+    return 0;
+}
+
+static int cmd_irqen(const struct shell *shell, size_t argc, char **argv)
+{
+    uint32_t val;
+
+    shell_print(shell, "Asserting IRQ to HOST"); 
+
+    val = 0x20000;
+    qdev->write(0x400 , &val, 4); //write(addr, &data, len)
+
+    val =0x80000000;
+    qdev->write(0x494 , &val, 4); //write(addr, &data, len)
+
+    val = 0x7fff7bee;
+    qdev->write(0x484 , &val, 4); //write(addr, &data, len)
+
+    return 0;
+}
+
+static int cmd_irqdis(const struct shell *shell, size_t argc, char **argv)
+{
+    uint32_t val;
+
+    shell_print(shell, "de-asserting IRQ to HOST"); 
+
+    val = 0x1;
+    qdev->write(0x488 , &val, 4); //write(addr, &data, len)
+
     return 0;
 }
 
@@ -674,6 +710,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_wifiutils,
         SHELL_CMD(wrsr2,   NULL, "Write to WRSR2 register", cmd_wrsr2),
         SHELL_CMD(rdsr1,   NULL, "Read RDSR1 register", cmd_rdsr1),
         SHELL_CMD(rdsr2,   NULL, "Read RDSR2 register", cmd_rdsr2),
+        SHELL_CMD(irqen,   NULL, "Generates IRQ interrup to HOST", cmd_irqen),
+        SHELL_CMD(irqdis,   NULL, "Clears generated Host IRQ interrupt", cmd_irqdis),
         SHELL_CMD(memmap,   NULL, "Gives the full memory map of the Sheliak chip", cmd_memmap),
         SHELL_CMD(memtest,  NULL, "Writes, reads back and validates specified memory on Seliak chip", cmd_memtest),
         SHELL_CMD(ver,   NULL, "Display SW version of the hex file", cmd_ver),
