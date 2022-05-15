@@ -29,6 +29,7 @@
     #define PIN_IRQ     24  //P0.24 on FPGA
 #endif
 
+#define SW_VER          "1.5"
 
 extern struct qspi_config *qspi_config;
 const struct qspi_dev *qdev;
@@ -512,7 +513,7 @@ static int func_rpuclks_on(void)
     uint32_t rpu_clks = 0x100;
     // Enable RPU Clocks
     qdev->write(0x048C20 , &rpu_clks, 4); //write(addr, &data, len)
-    printk("RPU Clocks ON...");
+    printk("RPU Clocks ON...\n");
     return 0;
 }
 
@@ -611,9 +612,47 @@ static void cmd_help(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "uart:~$ wifiutils wifi_off ");
     shell_print(shell, "         This writes 0 to IOVDD Control (P0.31) and then writes 0 to BUCKEN Control (P0.12)"); 
     shell_print(shell, "  "); 
+    shell_print(shell, "uart:~$ wifiutils sleep_stats ");
+    shell_print(shell, "         This continuously does the RPU sleep/wake cycle and displays stats "); 
+    shell_print(shell, "  "); 
+    shell_print(shell, "uart:~$ wifiutils gpio_config ");
+    shell_print(shell, "         Configures BUCKEN(P0.12) as o/p, IOVDD control (P0.31) as output and HOST_IRQ (P0.23) as input"); 
+    shell_print(shell, "         and interruptible with a ISR hooked to it"); 
+    shell_print(shell, "  "); 
+    shell_print(shell, "uart:~$ wifiutils qspi_init ");
+    shell_print(shell, "         Initializes QSPI driver functions "); 
+    shell_print(shell, "  "); 
+    shell_print(shell, "uart:~$ wifiutils pwron ");
+    shell_print(shell, "         Sets BUCKEN=1, delay, IOVDD cntrl=1 "); 
+    shell_print(shell, "  "); 
+    shell_print(shell, "uart:~$ wifiutils rpuwake ");
+    shell_print(shell, "         Wakeup RPU: Write 0x1 to WRSR2 register"); 
+    shell_print(shell, "  "); 
+    shell_print(shell, "uart:~$ wifiutils rpuclks_on ");
+    shell_print(shell, "         Enables all gated RPU clocks. Only SysBUS and PKTRAM will work w/o this setting enabled"); 
+    shell_print(shell, "  "); 
+    shell_print(shell, "uart:~$ wifiutils wrsr2 <val> ");
+    shell_print(shell, "         writes <val> (0/1) to WRSR2 reg - takes LSByte of <val>"); 
+    shell_print(shell, "  "); 
+    shell_print(shell, "uart:~$ wifiutils rdsr1 ");
+    shell_print(shell, "         Reads RDSR1 Register"); 
+    shell_print(shell, "  "); 
+    shell_print(shell, "uart:~$ wifiutils rdsr2 ");
+    shell_print(shell, "         Reads RDSR2 Register"); 
+    shell_print(shell, "  "); 
+    shell_print(shell, "uart:~$ wifiutils ver ");
+    shell_print(shell, "         Display SW version of the hex file "); 
+    shell_print(shell, "  "); 
     shell_print(shell, "uart:~$ wifiutils help ");
     shell_print(shell, "         Lists all commands with usage example(s) "); 
     shell_print(shell, "  "); 
+}
+
+static int cmd_ver(const struct shell *shell, size_t argc, char **argv)
+{
+
+    shell_print(shell, "wifiutils Version: %s",SW_VER); 
+    return 0;
 }
 
 /* Creating subcommands (level 1 command) array for command "demo". */
@@ -626,7 +665,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_wifiutils,
         SHELL_CMD(read_wrd,   NULL, "Reads a word from Sheliak host memory via QSPI interface", cmd_read_wrd),
         SHELL_CMD(wifi_on,   NULL, "BUCKEN-IOVDD power ON", cmd_wifi_on),
         SHELL_CMD(wifi_off,   NULL, "BUCKEN-IOVDD power OFF", cmd_wifi_off),
-        SHELL_CMD(sleep_stats,   NULL, "Gives the full memory map of the Sheliak chip", cmd_sleep_stats),
+        SHELL_CMD(sleep_stats,   NULL, "Tests Sleep/Wakeup cycles", cmd_sleep_stats),
         SHELL_CMD(gpio_config,   NULL, "Configure all GPIOs", cmd_gpio_config),
         SHELL_CMD(qspi_init,   NULL, "Initialize QSPI driver functions", cmd_qspi_init),
         SHELL_CMD(pwron,   NULL, "BUCKEN=1, delay, IOVDD=1", cmd_pwron),
@@ -637,6 +676,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_wifiutils,
         SHELL_CMD(rdsr2,   NULL, "Read RDSR2 register", cmd_rdsr2),
         SHELL_CMD(memmap,   NULL, "Gives the full memory map of the Sheliak chip", cmd_memmap),
         SHELL_CMD(memtest,  NULL, "Writes, reads back and validates specified memory on Seliak chip", cmd_memtest),
+        SHELL_CMD(ver,   NULL, "Display SW version of the hex file", cmd_ver),
         SHELL_CMD(help,   NULL, "Help with all supported commmands", cmd_help),
         SHELL_SUBCMD_SET_END
 );
@@ -648,4 +688,5 @@ SHELL_CMD_REGISTER(wifiutils, &sub_wifiutils, "wifiutils commands", NULL);
 void main(void)
 {
     printk("\nWelcome to wifiutils shell for interactive debug with Sheliak SoC via QSPI interface\n");
+    printk("wifiutils Version: %s\n\n",SW_VER); 
 } /* main() */
