@@ -29,7 +29,7 @@
     #define PIN_IRQ     24  //P0.24 on FPGA
 #endif
 
-#define SW_VER          "1.5.1"
+#define SW_VER          "1.5.2"
 
 extern struct qspi_config *qspi_config;
 const struct qspi_dev *qdev;
@@ -561,21 +561,7 @@ static int cmd_wifi_off(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_memmap(const struct shell *shell, size_t argc, char **argv)
 {
-    shell_print(shell, "                                            "); 
-    shell_print(shell, " ===========================================");
-    shell_print(shell, "         Sheliak memory map                 ");
-    shell_print(shell, " ===========================================");
-    shell_print(shell, " SysBus         : 0x%06x - 0x%06x (%d words)",shk_memmap[0][0], shk_memmap[0][1],(1+(shk_memmap[0][1]-shk_memmap[0][0]))>>2);
-    shell_print(shell, " PBus           : 0x%06x - 0x%06x (%d words)",shk_memmap[1][0], shk_memmap[1][1],(1+(shk_memmap[1][1]-shk_memmap[1][0]))>>2);
-    shell_print(shell, " PKTRAM         : 0x%06x - 0x%06x (%d words)",shk_memmap[2][0], shk_memmap[2][1],(1+(shk_memmap[2][1]-shk_memmap[2][0]))>>2);
-    shell_print(shell, " GRAM           : 0x%06x - 0x%06x (%d words)",shk_memmap[3][0], shk_memmap[3][1],(1+(shk_memmap[3][1]-shk_memmap[3][0]))>>2);
-    shell_print(shell, " LMAC_ROM       : 0x%06x - 0x%06x (%d words)",shk_memmap[4][0], shk_memmap[4][1],(1+(shk_memmap[4][1]-shk_memmap[4][0]))>>2);
-    shell_print(shell, " LMAC_RET_RAM   : 0x%06x - 0x%06x (%d words)",shk_memmap[5][0], shk_memmap[5][1],(1+(shk_memmap[5][1]-shk_memmap[5][0]))>>2);
-    shell_print(shell, " LMAC_SCR_RAM   : 0x%06x - 0x%06x (%d words)",shk_memmap[6][0], shk_memmap[6][1],(1+(shk_memmap[6][1]-shk_memmap[6][0]))>>2);
-    shell_print(shell, " UMAC_ROM       : 0x%06x - 0x%06x (%d words)",shk_memmap[7][0], shk_memmap[7][1],(1+(shk_memmap[7][1]-shk_memmap[7][0]))>>2);
-    shell_print(shell, " UMAC_RET_RAM   : 0x%06x - 0x%06x (%d words)",shk_memmap[8][0], shk_memmap[8][1],(1+(shk_memmap[8][1]-shk_memmap[8][0]))>>2);
-    shell_print(shell, " UMAC_SCR_RAM   : 0x%06x - 0x%06x (%d words)",shk_memmap[9][0], shk_memmap[9][1],(1+(shk_memmap[9][1]-shk_memmap[9][0]))>>2);
-    shell_print(shell, "                                            "); 
+    print_memmap();
     return 0; 
 }
 
@@ -685,7 +671,7 @@ static int cmd_irqdis(const struct shell *shell, size_t argc, char **argv)
 
     shell_print(shell, "de-asserting IRQ to HOST"); 
 
-    val = 0x1;
+    val = 0x80000000;
     qdev->write(0x488 , &val, 4); //write(addr, &data, len)
 
     return 0;
