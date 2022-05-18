@@ -75,9 +75,8 @@ struct qspi_config *qspi_defconfig(void)
 	return &config;
 }
 
-//struct qspi_dev *qspi_dev(bool qspi_flag)
-struct qspi_dev *qspi_dev(void)
+struct qspi_dev *qspi_dev(bool spim_flag)
 {
-	//return (qspi_flag)? &qspi : &spim;
-	return &qspi;
+	// spim_flag : 0 -> qspi, 1 -> spim
+	return (spim_flag)? &spim : &qspi;
 }

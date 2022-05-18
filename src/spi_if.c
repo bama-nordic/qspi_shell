@@ -433,10 +433,10 @@ static int spim_nrfx_pm_control(const struct device *dev,
 		.max_chunk_len = (1 << SPIM##idx##_EASYDMA_MAXCNT_SIZE) - 1,   \
 		.max_freq = SPIM##idx##_MAX_DATARATE * 1000000,		       \
 		.config = {						       \
-			.sck_pin   = DT_PROP(QSPI_NODE, sck_pin),              \
-			.mosi_pin  = QSPI_PROP_AT(io_pins, 0),		       \
-			.miso_pin  = QSPI_PROP_AT(io_pins, 1),		       \
-			.ss_pin    = QSPI_PROP_AT(csn_pins, 0),		       \
+                        .sck_pin   = SPIM_PROP(idx, sck_pin),                  \
+                        .mosi_pin  = SPIM_PROP(idx, mosi_pin),                 \
+                        .miso_pin  = SPIM_PROP(idx, miso_pin),                 \
+                        .ss_pin    = SPIM_PROP(idx, ss_pin),                   \
 			.orc       = CONFIG_SPI_##idx##_NRF_ORC,	       \
 			.frequency = NRF_SPIM_FREQ_4M,			       \
 			.mode      = NRF_SPIM_MODE_0,			       \
@@ -622,7 +622,7 @@ unsigned int spim_wait_while_rpu_awake(const struct device *spi_perip, const str
 
 		err = spi_transceive(spi_perip, spi_cfg, &tx, &rx);
 
-		/* printk("%x %x %x %x %x %x\n", sr[0], sr[1], sr[2], sr[3], sr[4], sr[5]); */
+		printk("%x %x %x %x %x %x\n", sr[0], sr[1], sr[2], sr[3], sr[4], sr[5]);
 
 	} while ((err < 0) || ((sr[1] & RPU_AWAKE_BIT) == 0));
 
