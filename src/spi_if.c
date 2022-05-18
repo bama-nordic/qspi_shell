@@ -436,7 +436,7 @@ static int spim_nrfx_pm_control(const struct device *dev,
                         .sck_pin   = SPIM_PROP(idx, sck_pin),                  \
                         .mosi_pin  = SPIM_PROP(idx, mosi_pin),                 \
                         .miso_pin  = SPIM_PROP(idx, miso_pin),                 \
-                        .ss_pin    = SPIM_PROP(idx, ss_pin),                   \
+			.ss_pin    = 0x2c,\
 			.orc       = CONFIG_SPI_##idx##_NRF_ORC,	       \
 			.frequency = NRF_SPIM_FREQ_4M,			       \
 			.mode      = NRF_SPIM_MODE_0,			       \
@@ -488,7 +488,7 @@ const struct device *spim_perip_get(void)
 		return NULL;
 	}
 
-	/* printf("%p : got device\n", spi_perip); */
+	printk("%p : got device\n", spi_perip);
 
 	return spi_perip;
 }
@@ -618,6 +618,7 @@ unsigned int spim_wait_while_rpu_awake(const struct device *spi_perip, const str
 		.count = 1
 	};
 
+#if 0
 	do {
 
 		err = spi_transceive(spi_perip, spi_cfg, &tx, &rx);
@@ -632,14 +633,81 @@ unsigned int spim_wait_while_rpu_awake(const struct device *spi_perip, const str
 		/* Connect MISO to MOSI for loopback */
 		/* printk("TX sent: %x\n", tx_buffer[0]); */
 	}
+#else
+
+	for (int ii = 0; ii<10; ii++) {
+
+		err = spi_transceive(spi_perip, spi_cfg, &tx, &rx);
+
+		printk("%x %x %x %x %x %x\n", sr[0], sr[1], sr[2], sr[3], sr[4], sr[5]);
+
+	        if ((err < 0) || ((sr[1] & RPU_AWAKE_BIT) == 0)) {
+			printk("ret val = 0x%x\t RDSR1 = 0x%x --- FAILED RPU Wakeup\n",err, sr[1]);
+		} else {
+			printk("ret val = 0x%x\t RDSR1 = 0x%x -- RPU Awake!!\n",err, sr[1]);
+			break;
+		}
+                k_msleep(1);
+	}
+	 
+#endif
+
 
 	return 0;
 }
 
-unsigned int spim_cmd_rpu_wakeup(const struct device *spi_perip, const struct spi_config *spi_cfg)
+/* Wait until RDSR2 confirms RPU_WAKE write is successful */
+unsigned int spim_validate_rpu_awake(const struct device *spi_perip, const struct spi_config *spi_cfg)
+{
+	int err, len;
+	static uint8_t tx_buffer[6] = {0x2f};
+
+	len = sizeof(tx_buffer);
+
+	const struct spi_buf tx_buf = {
+		.buf = tx_buffer,
+		.len = len
+	};
+	const struct spi_buf_set tx = {
+		.buffers = &tx_buf,
+		.count = 1
+	};
+
+	uint8_t sr[6];
+
+	struct spi_buf rx_buf = {
+		.buf = &sr,
+		.len = sizeof(sr),
+	};
+	const struct spi_buf_set rx = {
+		.buffers = &rx_buf,
+		.count = 1
+	};
+
+	for (int ii = 0; ii<1; ii++) {
+
+		err = spi_transceive(spi_perip, spi_cfg, &tx, &rx);
+
+		printk("%x %x %x %x %x %x\n", sr[0], sr[1], sr[2], sr[3], sr[4], sr[5]);
+
+	        if ((err < 0) || ((sr[1] & RPU_AWAKE_BIT) == 0)) {
+			printk("RDSR2 = 0x%x\n",sr[1]);
+		} else {
+			printk("RDSR2 = 0x%x\n",sr[1]);
+			break;
+		}
+                //k_msleep(1);
+	}
+	 
+	return 0;
+}
+
+unsigned int spim_cmd_rpu_wakeup(const struct device *spi_perip, const struct spi_config *spi_cfg, uint32_t data)
 {
 	int err, len;
 	static uint8_t tx_buffer[] = {0x3f, 0x1};
+
+	tx_buffer[1] = data&0xff;
 
 	/* printf("TODO : %s:\n", __func__); */
 
@@ -666,6 +734,35 @@ unsigned int spim_cmd_rpu_wakeup(const struct device *spi_perip, const struct sp
 	return 0;
 }
 
+unsigned int spim_cmd_sleep_rpu(const struct device *spi_perip, const struct spi_config *spi_cfg)
+{
+	int err, len;
+	static uint8_t tx_buffer[] = {0x3f, 0x0};
+
+	/* printf("TODO : %s:\n", __func__); */
+
+	len = sizeof(tx_buffer);
+
+	const struct spi_buf tx_buf = {
+		.buf = tx_buffer,
+		.len = len
+	};
+	const struct spi_buf_set tx = {
+		.buffers = &tx_buf,
+		.count = 1
+	};
+
+	err = spi_transceive(spi_perip, spi_cfg, &tx, NULL);
+
+	if (err) {
+		printk("SPI error: %d\n", err);
+	} else {
+		/* Connect MISO to MOSI for loopback */
+		/* printk("TX sent: %x\n", tx_buffer[0]); */
+	}
+
+	return 0;
+}
 static const struct spi_config spi_cfg = {
 	.operation = SPI_WORD_SET(8) | SPI_TRANSFER_MSB,
 	.frequency = 8000000,
@@ -689,14 +786,20 @@ int spim_init(struct qspi_config *config)
 	config->spimfreq = config->freq * 1000000;
 #endif
 
-	k_sem_init(&spim_config->lock, 1, 1);
+        printk("sck pin = 0x%08x \n",spi_4z_config.config.sck_pin);                  \
+        printk("mosi pin = 0x%08x \n",spi_4z_config.config.mosi_pin);                  \
+        printk("miso pin = 0x%08x \n",spi_4z_config.config.miso_pin);                  \
+        printk("ss pin = 0x%08x \n",spi_4z_config.config.ss_pin);                  \
 
+	k_sem_init(&spim_config->lock, 1, 1);
+#if 0
 	spim_cmd_rpu_wakeup(spim_perip, &spi_cfg);
 
 	spim_wait_while_rpu_awake(spim_perip, &spi_cfg);
-
+#endif
 	return 0;
 }
+
 
 void spim_addr_check(unsigned int addr, const void *data, unsigned int len)
 {
@@ -785,4 +888,26 @@ int spim_hl_read(unsigned int addr, void *data, int len)
 	}
 
 	return 0;
+}
+
+//------------------------------added for wifi utils --------------------------------
+
+void spim_cmd_rpu_wakeup_fn(const struct device *spi_perip, uint32_t data)
+{
+    spim_cmd_rpu_wakeup(spim_perip, &spi_cfg, data);
+}
+
+void spim_cmd_sleep_rpu_fn(const struct device *spi_perip) {
+
+    spim_cmd_sleep_rpu(spim_perip, &spi_cfg);
+}
+	
+void spim_wait_while_rpu_awake_fn(const struct device *spi_perip)
+{
+    spim_wait_while_rpu_awake(spim_perip, &spi_cfg);
+}
+
+void spim_validate_rpu_awake_fn(const struct device *spi_perip)
+{
+    spim_validate_rpu_awake(spim_perip, &spi_cfg);
 }

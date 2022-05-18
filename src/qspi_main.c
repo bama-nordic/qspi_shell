@@ -18,19 +18,30 @@
 #include "qspi_if.h"
 #include "spi_if.h"
 
+#define QSPI_IF          0  // 1-> QSPI IF, 0-> SPIM IF
 #define SHELIAK_SOC      1  // 0 for FPGA builds
 #define SLEEP_TIME_MS    5
+
+#if QSPI_IF
 #define PIN_BUCKEN      12  //P0.12
 #define PIN_IOVDD       31  //P0.31
+#else
+#define PIN_BUCKEN       1  //P1.01
+#define PIN_IOVDD        0  //P1.00
+#endif
+
 
 #if SHELIAK_SOC
-    #define PIN_IRQ     23  //P0.23 on SoC
+#if QSPI_IF
+    #define PIN_IRQ     23  //P0.23 on DK
+#else
+    #define PIN_IRQ      9  //P1.9 on EK
+#endif
 #else
     #define PIN_IRQ     24  //P0.24 on FPGA
 #endif
 
 #define SW_VER          "1.5.2"
-
 
 const struct device *gpio_dev;
 static bool hl_flag;
@@ -39,7 +50,6 @@ static int selected_blk;
 extern struct qspi_config *qspi_config;
 const struct qspi_dev *qdev;
 struct qspi_config *cfg;
-static bool qspi_spim_flag = 0; //0=qspi, 1= spim
 
 static uint32_t shk_memmap[][3] = {
     {0x000000, 0x008FFF, 1}, //0 SysBus
@@ -311,6 +321,37 @@ static int cmd_memtest(const struct shell *shell, size_t argc, char **argv)
 }
 
 
+void get_sleep_stats(uint32_t addr, uint32_t *buff, uint32_t wrd_len)
+{
+#if QSPI_IF
+    qspi_cmd_wakeup_rpu(&qspi_perip,0x1);
+    printk("Waiting for RPU awake...\n");
+
+    qspi_validate_rpu_wake_writecmd(&qspi_perip);
+    printk("exited qspi_validate_rpu_wake_writecmd(). Waiting for rpu_awake.....\n");
+
+    qspi_wait_while_firmware_awake(&qspi_perip);
+    printk("exited qspi_wait_while_rpu_awake()...\n");
+
+    (hl_flag)? qdev->hl_read(addr, buff, wrd_len*4) : qdev->read(addr, buff, wrd_len*4);
+    qspi_cmd_sleep_rpu(&qspi_perip);
+
+#else
+    spim_cmd_rpu_wakeup_fn(spim_perip, 0x1);
+    printk("exited spim_cmd_rpu_wakeup_fn()\n");
+
+    spim_validate_rpu_awake_fn(spim_perip);
+    printk("exited spim_validate_rpu_awake_fn(). Waiting for rpu_awake.....\n");
+
+    spim_wait_while_rpu_awake_fn(spim_perip);
+
+    (hl_flag)? qdev->hl_read(addr, buff, wrd_len*4) : qdev->read(addr, buff, wrd_len*4);
+    spim_cmd_sleep_rpu_fn(&qspi_perip);
+
+#endif
+
+}
+
 static int cmd_sleep_stats(const struct shell *shell, size_t argc, char **argv)
 {
 
@@ -346,7 +387,7 @@ static int func_gpio_config()
 
     int ret;
 
-    gpio_dev = device_get_binding("GPIO_0");
+    gpio_dev = device_get_binding("GPIO_1");
     if (gpio_dev == NULL) {
         return -1;
     }
@@ -425,10 +466,9 @@ static int cmd_config(const struct shell *shell, size_t argc, char **argv)
     // Re-initialize cfg
     cfg = qspi_defconfig();
 
-    qspi_spim_flag = (bool)(strtoul(argv[1], NULL, 0) & 0x1);
-    qspi_spim_freq_MHz = strtoul(argv[2], NULL, 0);
-    mem_block = strtoul(argv[3], NULL, 0);
-    qspi_spim_latency = strtoul(argv[4], NULL, 0);
+    qspi_spim_freq_MHz = strtoul(argv[1], NULL, 0);
+    mem_block = strtoul(argv[2], NULL, 0);
+    qspi_spim_latency = strtoul(argv[3], NULL, 0);
 
 
     cfg->freq = qspi_spim_freq_MHz;
@@ -436,7 +476,6 @@ static int cmd_config(const struct shell *shell, size_t argc, char **argv)
     cfg->qspi_slave_latency = qspi_spim_latency;
     printk("QSPIM freq = %d MHz\n",cfg->freq);
     printk("QSPIM latency = %d \n",cfg->qspi_slave_latency);
-    printk("Q/SPIM flag = %d \n",qspi_spim_flag);
 
     return 0;
 }
@@ -446,17 +485,18 @@ static int cmd_config(const struct shell *shell, size_t argc, char **argv)
 
 static void func_qspi_init(void)
 {
-#if 0
-    qspi_spim_flag = 0;
-    cfg->freq = 8;
-    cfg->qspi_slave_latency = 0;
+
+#if QSPI_IF
+    qdev = qspi_dev(0); // QSPI dev
+#else
+    qdev = qspi_dev(1); // SPIM dev
 #endif
-    qdev = qspi_dev(qspi_spim_flag); // QSPI
+
     qdev->init(cfg);
-    printk("Q/SPIM freq = %d MHz\n",cfg->freq);
-    printk("Q/SPIM latency = %d \n",cfg->qspi_slave_latency);
-    printk("Q/SPIM flag = %d \n",qspi_spim_flag);
-    printk("Q/SPIM Config done...\n");
+
+    printk("QSPI/SPIM freq = %d MHz\n",cfg->freq);
+    printk("QSPI/SPIM latency = %d \n",cfg->qspi_slave_latency);
+    printk("QSPI/SPIM Config done...\n");
 }
 
 static int cmd_qspi_init(const struct shell *shell, size_t argc, char **argv)
@@ -473,14 +513,23 @@ static int func_rpuwake(void)
 {
 
 #if SHELIAK_SOC
-    qspi_cmd_wakeup_rpu(&qspi_perip,0x1);
+#if QSPI_IF
+    qspi_cmd_wakeup_rpu(&qspi_perip, 0x1);
     printk("exited qspi_cmd_wakeup_rpu()\n");
 
     qspi_validate_rpu_wake_writecmd(&qspi_perip);
     printk("exited qspi_validate_rpu_wake_writecmd(). Waiting for rpu_awake.....\n");
 
     qspi_wait_while_rpu_awake(&qspi_perip);
+#else
+    spim_cmd_rpu_wakeup_fn(spim_perip, 0x1);
+    printk("exited spim_cmd_rpu_wakeup_fn()\n");
 
+    spim_wait_while_rpu_awake_fn(spim_perip);
+    printk("exited spim_wait_while_rpu_awake_fn(). Waiting for rpu_awake.....\n");
+
+    spim_validate_rpu_awake_fn(spim_perip);
+#endif
 #else
 #endif
 
@@ -497,7 +546,12 @@ static int cmd_rpuwake(const struct shell *shell, size_t argc, char **argv)
 
 static int func_wrsr2(uint8_t data)
 {
+#if QSPI_IF
     qspi_cmd_wakeup_rpu(&qspi_perip,data);
+#else
+    spim_cmd_rpu_wakeup_fn(spim_perip,data);
+#endif
+
     printk("Written 0x%x to WRSR2\n",data);
     return 0;
 }
@@ -515,7 +569,12 @@ static int cmd_wrsr2(const struct shell *shell, size_t argc, char **argv)
 //--------------------------------------------------------------------------------------
 static int func_rdsr2(void)
 {
+#if QSPI_IF
     qspi_validate_rpu_wake_writecmd(&qspi_perip);
+#else
+    spim_validate_rpu_awake_fn(spim_perip);
+#endif
+
     return 0;
 }
 
@@ -529,7 +588,11 @@ static int cmd_rdsr2(const struct shell *shell, size_t argc, char **argv)
 
 static int func_rdsr1(void)
 {
+#if QSPI_IF
     qspi_wait_while_rpu_awake(&qspi_perip);
+#else
+    spim_wait_while_rpu_awake_fn(spim_perip);
+#endif
     return 0;
 }
 
@@ -562,19 +625,11 @@ static int cmd_rpuclks_on(const struct shell *shell, size_t argc, char **argv)
 //--------------------------------------------------------------------------------------
 static void func_wifi_on()
 {
-  if (qspi_spim_flag == 0) {  //QSPI
     func_gpio_config();
     func_pwron();
     func_qspi_init();
     func_rpuwake();
     func_rpuclks_on();
-  } else {                   //SPIM
-    func_gpio_config();
-    func_pwron();
-    func_qspi_init();
-    func_rpuclks_on();
-  }
-
 }
 
 static int cmd_wifi_on(const struct shell *shell, size_t argc, char **argv)
@@ -760,11 +815,9 @@ SHELL_CMD_REGISTER(wifiutils, &sub_wifiutils, "wifiutils commands", NULL);
 
 void main(void)
 {
-    //qspi_spim_flag = 0; //0=qspi, 1= spim
     cfg = qspi_defconfig();
     printk("QSPIM freq = %d MHz\n",cfg->freq);
     printk("QSPIM latency = %d \n",cfg->qspi_slave_latency);
-    printk("Q/SPIM flag = %d \n",qspi_spim_flag);
 
     printk("\nWelcome to wifiutils shell for interactive debug with Sheliak SoC via QSPI interface\n");
     printk("wifiutils Version: %s\n\n",SW_VER); 

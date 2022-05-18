@@ -40,3 +40,13 @@ int spim_write(unsigned int addr, const void *data, int len);
 int spim_read(unsigned int addr, void *data, int len);
 
 int spim_hl_read(unsigned int addr, void *data, int len);
+
+extern const struct device *spim_perip;
+
+void spim_cmd_rpu_wakeup_fn(const struct device *spi_perip, uint32_t data);
+
+void spim_wait_while_rpu_awake_fn(const struct device *spi_perip);
+
+void spim_validate_rpu_awake_fn(const struct device *spi_perip);
+
+void spim_cmd_sleep_rpu_fn(const struct device *spi_perip);

@@ -1282,8 +1282,7 @@ int qspi_wait_while_rpu_awake(const struct device *dev)
 
 		ANOMALY_122_UNINIT(dev);
                 
-		//if ((ret < 0) || ((sr & RPU_AWAKE_BIT) == 0)) {
-		if ((ret < 0) || (sr!= 0x2)) {
+		if ((ret < 0) || ((sr & RPU_AWAKE_BIT) == 0)) {
 			printk("ret val = 0x%x\t RDSR1 = 0x%x\n",ret, sr);
 		} else {
 			printk("ret val = 0x%x\t RDSR1 = 0x%x\n",ret, sr);
@@ -1298,6 +1297,42 @@ int qspi_wait_while_rpu_awake(const struct device *dev)
 	return ret;
 }
 
+/* Wait until RDSR1 confirms RPU_AWAKE/RPU_READY and Firmware is booted */
+int qspi_wait_while_firmware_awake(const struct device *dev)
+{
+	int ret = 0;
+	uint8_t sr = 0;
+
+	const struct qspi_buf sr_buf = {
+		.buf = &sr,
+		.len = sizeof(sr),
+	};
+	struct qspi_cmd cmd = {
+		.op_code = 0x1f,
+		.rx_buf = &sr_buf,
+	};
+
+	for (int ii = 0; ii<10; ii++) {
+		int ret ;
+		ret = ANOMALY_122_INIT(dev);
+
+		if (ret == 0)
+			ret = qspi_send_cmd(dev, &cmd, false);
+
+		ANOMALY_122_UNINIT(dev);
+                
+		if ((ret < 0) || (sr!=0x6)) {
+			printk("ret val = 0x%x\t RDSR1 = 0x%x\n",ret, sr);
+		} else {
+			printk("ret val = 0x%x\t RDSR1 = 0x%x\n",ret, sr);
+			printk("RPU is awake...\n");
+			break;
+		}
+                k_msleep(1);
+	}
+	 
+	return ret;
+}
 int qspi_cmd_wakeup_rpu(const struct device *dev, uint8_t data)
 {
 	//uint8_t data = 0x1;
@@ -1541,19 +1576,3 @@ int qspi_cmd_sleep_rpu(const struct device *dev)
       return ret;
 }
 
-void get_sleep_stats(uint32_t addr, uint32_t *buff, uint32_t wrd_len)
-{
-    uint32_t status;
-
-    qspi_cmd_wakeup_rpu(&qspi_perip,0x1);
-    printk("Waiting for RPU awake...\n");
-
-    qspi_validate_rpu_wake_writecmd(&qspi_perip);
-    printk("exited qspi_validate_rpu_wake_writecmd(). Waiting for rpu_awake.....\n");
-
-    status = qspi_wait_while_rpu_awake(&qspi_perip);
-    printk("exited qspi_wait_while_rpu_awake()...\n");
-
-    qspi_read(addr, buff, wrd_len*4);
-    qspi_cmd_sleep_rpu(&qspi_perip);
-}
