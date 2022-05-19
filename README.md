@@ -99,6 +99,7 @@ uart:~$ wifiutils help
 * All lengths specified (num_words) are 32-bit word lengths. No support for byte read/write (Where required, the user has to use read-modify-write sequence to implement byte writes)
 * All memory blocks (start address + length) used for read/write/memtest etc should be within a specific memory block (PKTRAM, GRAM etc - see 'memmap' command for details). Any address range straddling these blocks will not be accepted.
 * write_blk and read_blk commands accept a maximum of 2000 words while memtest command accepts any valid length of words
-* Python script provided can be used in the python interactive shell - this can be used in place of a serial port application (TeraTerm/minicom etc). Example usage is provided in the table above as logs)
+* Python script provided can be used in the python interactive shell - this can be used in place of a serial port application (TeraTerm/minicom etc).
 * The script is provided as-is only as an example. The user is expected to extend it to their usage.
 * The nRF700x Hex file will NOT work on nRF53+FPGA setup since there will be a conflict about who drives the BUCKEN (this will be driven from nRF5340 GPIO on nRF700x). Versions for nRF5340+FPGA are added in the table.
+* From v1.6, two hex files are releases. One for QSPI (nRF700x DK) build and another for SPIM build (EK boards on the arduino header of nRF boards)
