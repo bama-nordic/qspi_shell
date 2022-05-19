@@ -80,6 +80,7 @@ class WiFiUtilsClient():
         rx = self.read().decode()
         rx = rx.replace("wifiutils wifi_on","")
         rx = rx.replace("uart:~$","")
+        rx = rx.replace("←[1;32m ←[m","")
         print(rx)
 
     def wifi_off(self):
@@ -87,27 +88,87 @@ class WiFiUtilsClient():
         rx = self.read().decode()
         rx = rx.replace("wifiutils wifi_off","")
         rx = rx.replace("uart:~$","")
+        rx = rx.replace("←[1;32m ←[m","")
         print(rx)
 
     def memmap(self):
         self.execute_command(f'wifiutils memmap')
-        rx = self.read().decode()
-        rx = rx.replace("wifiutils memmap","")
-        rx = rx.replace("uart:~$","")
-        print(rx)
+        rx = self.read().decode().split("\r\n")[-(15+1):-1]
+        print("\n".join(rx))
+
+    def ver(self):
+        self.execute_command(f'wifiutils ver')
+        rx = self.read().decode().split("\r\n")[-(2+1):-1]
+        print("\n".join(rx))
+
 
     def help(self):
         self.execute_command(f'wifiutils help')
-        rx = self.read().decode()
-        rx = rx.replace("wifiutils help","")
-        rx = rx.replace("uart:~$","")
-        print(rx)
+        rx = self.read().decode().split("\r\n")[1:-1]
+        print("\n".join(rx))
 
     def memtest(self,addr,pattern,incr,wrd_len):
         self.execute_command(f'wifiutils memtest  {addr} {pattern} {incr} {wrd_len}')
         rx = self.read().decode().split("\r\n")[-2]
         print(rx)
 
+    def gpio_config(self):
+        self.execute_command(f'wifiutils gpio_config')
+        rx = self.read().decode().split("\r\n")[-3]
+        print(rx)
+        
+    def qspi_init(self):
+        self.execute_command(f'wifiutils qspi_init')
+        rx = self.read().decode().split("\r\n")[-(3+1):-1]
+        print("\n".join(rx))
+
+    def pwron(self):
+        self.execute_command(f'wifiutils pwron')
+        rx = self.read().decode().split("\r\n")[1:-1]
+        print("\n".join(rx))
+
+
+    def rpuwake(self):
+        self.execute_command(f'wifiutils rpuwake')
+        rx = self.read().decode().split("\r\n")[1:-1]
+        print("\n".join(rx))
+
+    def rpuclks_on(self):
+        self.execute_command(f'wifiutils rpuclks_on')
+        rx = self.read().decode().split("\r\n")[1:-1]
+        print("\n".join(rx))
+
+    def wrsr2(self,val):
+        self.execute_command(f'wifiutils wrsr2 {val}')
+        rx = self.read().decode().split("\r\n")[1:-1]
+        print("\n".join(rx))
+
+    def rdsr1(self):
+        self.execute_command(f'wifiutils rdsr1')
+        rx = self.read().decode().split("\r\n")[1:-1]
+        print("\n".join(rx))
+
+    def rdsr2(self):
+        self.execute_command(f'wifiutils rdsr2')
+        rx = self.read().decode().split("\r\n")[1:-1]
+        print("\n".join(rx))
+
+    def trigirq(self):
+        self.execute_command(f'wifiutils trigirq')
+        rx = self.read().decode().split("\r\n")[1:-1]
+        print("\n".join(rx))
+
+    def clrirq(self):
+        self.execute_command(f'wifiutils clrirq')
+        rx = self.read().decode().split("\r\n")[1:-1]
+        print("\n".join(rx))
+
+    def config(self, freq, block_num, read_latency):
+        self.execute_command(f'wifiutils config {freq} {block_num} {read_latency}')
+        rx = self.read().decode().split("\r\n")[2:-1]
+        print("\n".join(rx))
+
+    
     # Poll the OTP READY register
     def poll_otp_ready(self):
         rx = 0

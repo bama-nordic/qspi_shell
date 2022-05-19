@@ -1285,8 +1285,7 @@ int qspi_wait_while_rpu_awake(const struct device *dev)
 		if ((ret < 0) || ((sr & RPU_AWAKE_BIT) == 0)) {
 			printk("ret val = 0x%x\t RDSR1 = 0x%x\n",ret, sr);
 		} else {
-			printk("ret val = 0x%x\t RDSR1 = 0x%x\n",ret, sr);
-			printk("RPU is awake...\n");
+			printk("RDSR1 = 0x%x\n",sr);
 			break;
 		}
                 k_msleep(1);
@@ -1324,7 +1323,7 @@ int qspi_wait_while_firmware_awake(const struct device *dev)
 		if ((ret < 0) || (sr!=0x6)) {
 			printk("ret val = 0x%x\t RDSR1 = 0x%x\n",ret, sr);
 		} else {
-			printk("ret val = 0x%x\t RDSR1 = 0x%x\n",ret, sr);
+			printk("RDSR1 = 0x%x\n",sr);
 			printk("RPU is awake...\n");
 			break;
 		}

@@ -20,14 +20,14 @@
 
 #define QSPI_IF          0  // 1-> QSPI IF, 0-> SPIM IF
 #define SHELIAK_SOC      1  // 0 for FPGA builds
-#define SLEEP_TIME_MS    5
+#define SLEEP_TIME_MS    2
 
 #if QSPI_IF
-#define PIN_BUCKEN      12  //P0.12
-#define PIN_IOVDD       31  //P0.31
+  #define PIN_BUCKEN      12  //P0.12
+  #define PIN_IOVDD       31  //P0.31
 #else
-#define PIN_BUCKEN       1  //P1.01
-#define PIN_IOVDD        0  //P1.00
+  #define PIN_BUCKEN       1  //P1.01
+  #define PIN_IOVDD        0  //P1.00
 #endif
 
 
@@ -41,7 +41,7 @@
     #define PIN_IRQ     24  //P0.24 on FPGA
 #endif
 
-#define SW_VER          "1.5.2"
+#define SW_VER          "1.6"
 
 const struct device *gpio_dev;
 static bool hl_flag;
@@ -51,18 +51,47 @@ extern struct qspi_config *qspi_config;
 const struct qspi_dev *qdev;
 struct qspi_config *cfg;
 
+enum {
+    SysBus=0,
+    ExtSysBus,
+    PBus,
+    PKTRAM,
+    GRAM,
+    LMAC_ROM,
+    LMAC_RET_RAM,
+    LMAC_SRC_RAM,
+    UMAC_ROM,
+    UMAC_RET_RAM,
+    UMAC_SRC_RAM,
+    NUM_MEM_BLOCKS
+};
+
+static char blk_name[][15] = {
+    "SysBus",
+    "ExtSysBus",
+    "PBus",
+    "PKTRAM",
+    "GRAM",
+    "LMAC_ROM",
+    "LMAC_RET_RAM",
+    "LMAC_SRC_RAM",
+    "UMAC_ROM",
+    "UMAC_RET_RAM",
+    "UMAC_SRC_RAM"
+};
+
 static uint32_t shk_memmap[][3] = {
-    {0x000000, 0x008FFF, 1}, //0 SysBus
-    {0x009000, 0x03FFFF, 2}, //1 ExtSysBus
-    {0x040000, 0x07FFFF, 1}, //2 PBus
-    {0x0C0000, 0x0F0FFF, 0}, //3 PKTRAM
-    {0x080000, 0x092000, 1}, //4 GRAM
-    {0x100000, 0x134000, 1}, //5 LMAC_ROM
-    {0x140000, 0x14C000, 1}, //6 LMAC_RET_RAM
-    {0x180000, 0x190000, 1}, //7 LMAC_SCR_RAM
-    {0x200000, 0x261800, 1}, //8 UMAC_ROM
-    {0x280000, 0x2A4000, 1}, //9 UMAC_RET_RAM
-    {0x300000, 0x338000, 1}  //10 UMAC_SCR_RAM
+    {0x000000, 0x008FFF, 1},
+    {0x009000, 0x03FFFF, 2},
+    {0x040000, 0x07FFFF, 1},
+    {0x0C0000, 0x0F0FFF, 0},
+    {0x080000, 0x092000, 1},
+    {0x100000, 0x134000, 1},
+    {0x140000, 0x14C000, 1},
+    {0x180000, 0x190000, 1},
+    {0x200000, 0x261800, 1},
+    {0x280000, 0x2A4000, 1},
+    {0x300000, 0x338000, 1}
 };
 
 struct gpio_callback irq_callback_data;
@@ -73,21 +102,13 @@ void irq_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pi
 
 void print_memmap()
 {
-    printk( "                                            \n"); 
-    printk( " ===========================================\n");
-    printk( "         Sheliak memory map                 \n");
-    printk( " ===========================================\n");
-    printk( " SysBus         : 0x%06x - 0x%06x (%d words)\n",shk_memmap[0][0], shk_memmap[0][1],(shk_memmap[0][1]-shk_memmap[0][0])>>2);
-    printk( " ExtSysBus      : 0x%06x - 0x%06x (%d words)\n",shk_memmap[1][0], shk_memmap[1][1],(shk_memmap[1][1]-shk_memmap[1][0])>>2);
-    printk( " PBus           : 0x%06x - 0x%06x (%d words)\n",shk_memmap[2][0], shk_memmap[2][1],(shk_memmap[2][1]-shk_memmap[2][0])>>2);
-    printk( " PKTRAM         : 0x%06x - 0x%06x (%d words)\n",shk_memmap[3][0], shk_memmap[3][1],(shk_memmap[3][1]-shk_memmap[3][0])>>2);
-    printk( " GRAM           : 0x%06x - 0x%06x (%d words)\n",shk_memmap[4][0], shk_memmap[4][1],(shk_memmap[4][1]-shk_memmap[4][0])>>2);
-    printk( " LMAC_ROM       : 0x%06x - 0x%06x (%d words)\n",shk_memmap[5][0], shk_memmap[5][1],(shk_memmap[5][1]-shk_memmap[5][0])>>2);
-    printk( " LMAC_RET_RAM   : 0x%06x - 0x%06x (%d words)\n",shk_memmap[6][0], shk_memmap[6][1],(shk_memmap[6][1]-shk_memmap[6][0])>>2);
-    printk( " LMAC_SCR_RAM   : 0x%06x - 0x%06x (%d words)\n",shk_memmap[7][0], shk_memmap[7][1],(shk_memmap[7][1]-shk_memmap[7][0])>>2);
-    printk( " UMAC_ROM       : 0x%06x - 0x%06x (%d words)\n",shk_memmap[8][0], shk_memmap[8][1],(shk_memmap[8][1]-shk_memmap[8][0])>>2);
-    printk( " UMAC_RET_RAM   : 0x%06x - 0x%06x (%d words)\n",shk_memmap[9][0], shk_memmap[9][1],(shk_memmap[9][1]-shk_memmap[9][0])>>2);
-    printk( " UMAC_SCR_RAM   : 0x%06x - 0x%06x (%d words)\n",shk_memmap[10][0], shk_memmap[10][1],(shk_memmap[10][1]-shk_memmap[10][0])>>2);
+    printk( "                                                   \n"); 
+    printk( " ==================================================\n");
+    printk( "         Sheliak memory map                        \n");
+    printk( " ==================================================\n");
+    for (int i=0; i<NUM_MEM_BLOCKS; i++) {
+        printk( " %-14s : 0x%06x - 0x%06x (%05d words)\n",blk_name[i],shk_memmap[i][0], shk_memmap[i][1],1+((shk_memmap[i][1]-shk_memmap[i][0])>>2));
+    }
     printk( "                                            \n"); 
 }
 
@@ -96,13 +117,13 @@ static int validate_addr_blk(uint32_t start_addr, uint32_t end_addr,uint32_t blo
     if (  ((start_addr >= shk_memmap[block_no][0]) && (start_addr <= shk_memmap[block_no][1])) \
     && ((end_addr >= shk_memmap[block_no][0]) && (end_addr <= shk_memmap[block_no][1])) )
     {
-        if ((block_no == 3)) {
+        if ((block_no == PKTRAM)) {
             hl_flag = 0;
         }
         selected_blk = block_no; //Save the selected block no
         return 1;
     } else { 
-        //printk("Err!!! start_addr = 0x%08x, end_addr = 0x%08x, block = %d\n",start_addr,end_addr,block_no);
+        //printk("Err!!! start_addr = 0x%08x, end_addr = 0x%08x, block = %s\n",start_addr,end_addr,blk_name[block_no]);
         return 0;
     }
 } 
@@ -148,7 +169,7 @@ static int cmd_write_wrd(const struct shell *shell, size_t argc, char **argv)
 
     if (!validate_addr(addr, 1)) return -1;
 
-    if ((selected_blk == 5) || (selected_blk == 8)) {
+    if ((selected_blk == LMAC_ROM) || (selected_blk == UMAC_ROM)) {
         shell_print(shell, "Error... Cannot write to ROM blocks");
     }
 
@@ -180,7 +201,7 @@ static int cmd_write_blk(const struct shell *shell, size_t argc, char **argv)
     
     if (!validate_addr(addr, num_words*4)) return -1;
 
-    if ((selected_blk == 5) || (selected_blk == 8)) {
+    if ((selected_blk == LMAC_ROM) || (selected_blk == UMAC_ROM)) {
         shell_print(shell, "Error... Cannot write to ROM blocks");
     }
 
@@ -208,6 +229,7 @@ static int cmd_read_wrd(const struct shell *shell, size_t argc, char **argv)
     if (!validate_addr(addr, 1)) return -1;
 
     //shell_print(shell, "hl_read = %d",(int) hl_flag);
+    //printk("QSPI/SPIM latency = %d \n",cfg->qspi_slave_latency);
     (hl_flag)? qdev->hl_read(addr, &val, 4) : qdev->read(addr, &val, 4);
 
     //shell_print(shell, "addr = 0x%08x Read val = 0x%08x\n",addr, val);
@@ -234,6 +256,8 @@ static int cmd_read_blk(const struct shell *shell, size_t argc, char **argv)
     }
 
     if (!validate_addr(addr, num_words*4)) return -1;
+
+    //printk("QSPI/SPIM latency = %d \n",cfg->qspi_slave_latency);
 
     buff = (uint32_t *) k_malloc(num_words*4);
     
@@ -280,9 +304,11 @@ static int cmd_memtest(const struct shell *shell, size_t argc, char **argv)
 
     if (!validate_addr(addr, num_words*4)) return -1;
 
-    if ((selected_blk == 5) || (selected_blk == 8)) {
+    if ((selected_blk == LMAC_ROM) || (selected_blk == UMAC_ROM)) {
         shell_print(shell, "Error... Cannot write to ROM blocks");
     }
+
+    //printk("QSPI/SPIM latency = %d \n",cfg->qspi_slave_latency);
 
     buff = (uint32_t *) k_malloc(2000*4);
     rxbuff = (uint32_t *) k_malloc(2000*4);
@@ -364,7 +390,7 @@ static int cmd_sleep_stats(const struct shell *shell, size_t argc, char **argv)
 
     if (!validate_addr(addr, wrd_len*4)) return -1;
 
-    if ((selected_blk == 5) || (selected_blk == 8)) {
+    if ((selected_blk == LMAC_ROM) || (selected_blk == UMAC_ROM)) {
         shell_print(shell, "Error... Cannot write to ROM blocks");
     }
 
@@ -387,10 +413,18 @@ static int func_gpio_config()
 
     int ret;
 
+#if QSPI_IF
+    gpio_dev = device_get_binding("GPIO_0");
+    if (gpio_dev == NULL) {
+        return -1;
+    }
+#else
     gpio_dev = device_get_binding("GPIO_1");
     if (gpio_dev == NULL) {
         return -1;
     }
+#endif
+
 
     //Put P0.12 to highest drive mode H0H1 or E0E1
     ret = gpio_pin_configure(gpio_dev, PIN_BUCKEN, GPIO_OUTPUT|(GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos));
@@ -690,17 +724,36 @@ static void cmd_help(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "         reads them back and validates them"); 
     shell_print(shell, "  "); 
     shell_print(shell, "uart:~$ wifiutils wifi_on  ");
-    shell_print(shell, "         This writes 1 to BUCKEN (P0.12), waits for 0.5ms and then writes 1 to IOVDD Control (P0.31) "); 
+#if QSPI_IF
+    shell_print(shell, "         - Configures all gpio pins "); 
+    shell_print(shell, "         - Writes 1 to BUCKEN (P0.12), waits for 2ms and then writes 1 to IOVDD Control (P0.31) "); 
+    shell_print(shell, "         - Initializes qspi interface and wakes up RPU"); 
+    shell_print(shell, "         - Enables all gated RPU clocks"); 
+#else
+    shell_print(shell, "         - Configures all gpio pins "); 
+    shell_print(shell, "         - Writes 1 to BUCKEN (P1.01), waits for 2ms and then writes 1 to IOVDD Control (P1.00) "); 
+    shell_print(shell, "         - Initializes qspi interface and wakes up RPU"); 
+    shell_print(shell, "         - Enables all gated RPU clocks"); 
+#endif
     shell_print(shell, "  "); 
     shell_print(shell, "uart:~$ wifiutils wifi_off ");
+#if QSPI_IF
     shell_print(shell, "         This writes 0 to IOVDD Control (P0.31) and then writes 0 to BUCKEN Control (P0.12)"); 
+#else
+    shell_print(shell, "         This writes 0 to IOVDD Control (P1.00) and then writes 0 to BUCKEN Control (P1.01)"); 
+#endif
     shell_print(shell, "  "); 
     shell_print(shell, "uart:~$ wifiutils sleep_stats ");
     shell_print(shell, "         This continuously does the RPU sleep/wake cycle and displays stats "); 
     shell_print(shell, "  "); 
     shell_print(shell, "uart:~$ wifiutils gpio_config ");
+#if QSPI_IF
     shell_print(shell, "         Configures BUCKEN(P0.12) as o/p, IOVDD control (P0.31) as output and HOST_IRQ (P0.23) as input"); 
     shell_print(shell, "         and interruptible with a ISR hooked to it"); 
+#else
+    shell_print(shell, "         Configures BUCKEN(P1.01) as o/p, IOVDD control (P1.00) as output and HOST_IRQ (P1.09) as input"); 
+    shell_print(shell, "         and interruptible with a ISR hooked to it"); 
+#endif
     shell_print(shell, "  "); 
     shell_print(shell, "uart:~$ wifiutils qspi_init ");
     shell_print(shell, "         Initializes QSPI driver functions "); 
@@ -729,14 +782,14 @@ static void cmd_help(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "uart:~$ wifiutils clrirq ");
     shell_print(shell, "         Clears host IRQ generated interrupt"); 
     shell_print(shell, "  "); 
-    shell_print(shell, "uart:~$ wifiutils config <0/1> <qspi/spi Freq> <mem_block_num> <read_latency>");
-    shell_print(shell, "         0/1 : 0 = select QSPI interface, 1 = select SPIM interface"); 
+    shell_print(shell, "uart:~$ wifiutils config  <qspi/spi Freq> <mem_block_num> <read_latency>");
     shell_print(shell, "         QSPI/SPI clock freq in MHz : 4/8/16 etc"); 
     shell_print(shell, "         block num as per memmap (starting from 0) : 0-10"); 
     shell_print(shell, "         QSPI/SPIM read latency for the selected block : 0-255"); 
+    shell_print(shell, "         NOTE: need to do a wifi_off and wifi_on for these changes to take effect"); 
     shell_print(shell, "  "); 
     shell_print(shell, "uart:~$ wifiutils ver ");
-    shell_print(shell, "         Display SW version of the hex file "); 
+    shell_print(shell, "         Display SW version and other details of the hex file "); 
     shell_print(shell, "  "); 
     shell_print(shell, "uart:~$ wifiutils help ");
     shell_print(shell, "         Lists all commands with usage example(s) "); 
@@ -747,6 +800,11 @@ static int cmd_ver(const struct shell *shell, size_t argc, char **argv)
 {
 
     shell_print(shell, "wifiutils Version: %s",SW_VER); 
+#if QSPI_IF
+    shell_print(shell, "Build for QSPI interface on nRF7002 board"); 
+#else
+    shell_print(shell, "Build for SPIM interface on nRF7002EK+nRF5340DK connected via arduino header"); 
+#endif
     return 0;
 }
 
