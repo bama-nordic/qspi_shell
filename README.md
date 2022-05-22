@@ -3,20 +3,20 @@ A (Q)SPI shell for Sheliak test and debug
 
 # Commands supported -
 
-uart:~$ wifiutils read_wrd  <address> 
+`uart:~$ wifiutils read_wrd  <address> `
 
          ex: $ wifiutils read_wrd 0x0c0000
   
-uart:~$ wifiutils write_wrd  <address> <data>
+`uart:~$ wifiutils write_wrd  <address> <data>`
 
          ex: $ wifiutils write_wrd 0x0c0000 0xabcd1234
   
-uart:~$ wifiutils read_blk <address> <num_words>
+`uart:~$ wifiutils read_blk <address> <num_words>`
 
          ex: $ wifiutils read_blk 0x0c0000 64
          Note - num_words can be a maximum of 2000
   
-uart:~$ wifiutils write_blk <address> <start_pattern> <pattern_increment> <num_words>
+`uart:~$ wifiutils write_blk <address> <start_pattern> <pattern_increment> <num_words>`
 
          ex: $ wifiutils write_blk 0x0c0000 0xaaaa5555 0 64
          This writes pattern 0xaaaa5555 to 64 locations starting from 0x0c0000
@@ -26,70 +26,70 @@ uart:~$ wifiutils write_blk <address> <start_pattern> <pattern_increment> <num_w
          This writes pattern 0x0, 0x1,0x2,0x3....etc to 64 locations starting from 0x0c0000
          Note - num_words can be a maximum of 2000
   
-uart:~$ wifiutils memtest  <address> <start_pattern> <pattern_increment> <num_words>
+`uart:~$ wifiutils memtest  <address> <start_pattern> <pattern_increment> <num_words>`
 
          ex: $ wifiutils memtest 0x0c0000 0xaaaa5555 0 64
          This writes pattern 0xaaaa5555 to 64 locations starting from 0x0c0000,
          reads them back and validates them
   
-uart:~$ wifiutils wifi_on  
+`uart:~$ wifiutils wifi_on`  
 
          This writes 1 to BUCKEN (P0.12), waits for 0.5ms and then writes 1 to IOVDD Control (P0.31) 
   
-uart:~$ wifiutils wifi_off 
+`uart:~$ wifiutils wifi_off `
 
          This writes 0 to IOVDD Control (P0.31) and then writes 0 to BUCKEN Control (P0.12)
 
-uart:~$ wifiutils sleep_stats
+`uart:~$ wifiutils sleep_stats`
          
          This continuously does the RPU sleep/wake cycle and displays stats
 
-uart:~$ wifiutils gpio_config
+`uart:~$ wifiutils gpio_config`
          
          Configures BUCKEN(P0.12) as o/p, IOVDD control (P0.31) as output and HOST_IRQ (P0.23) as input
          and interruptible with a ISR hooked to it
 
-uart:~$ wifiutils qspi_init
+`uart:~$ wifiutils qspi_init`
          
          Initializes QSPI driver functions
 
-uart:~$ wifiutils pwron
+`uart:~$ wifiutils pwron`
          
          Sets BUCKEN=1, delay, IOVDD cntrl=1
 
-uart:~$ wifiutils rpuwake
+`uart:~$ wifiutils rpuwake`
          
          Wakeup RPU: Write 0x1 to WRSR2 register
 
-uart:~$ wifiutils rpuclks_on
+`uart:~$ wifiutils rpuclks_on`
          
          Enables all gated RPU clocks. Only SysBUS and PKTRAM will work w/o this setting enabled
 
-uart:~$ wifiutils wrsr2 <val>
+`uart:~$ wifiutils wrsr2 <val>`
          
          writes <val> (0/1) to WRSR2 reg - takes LSByte of <val>
 
-uart:~$ wifiutils rdsr1
+`uart:~$ wifiutils rdsr1`
          
          Reads RDSR1 Register
 
-uart:~$ wifiutils rdsr2
+`uart:~$ wifiutils rdsr2`
          
          Reads RDSR2 Register
          
-uart:~$ wifiutils irqen
+`uart:~$ wifiutils irqen`
          
          Enable IRQ interrupt to Host
          
-uart:~$ wifiutils irqdis
+`uart:~$ wifiutils irqdis`
          
          Clear the generated IRQ reg
          
-uart:~$ wifiutils ver
+`uart:~$ wifiutils ver`
          
          Display the verion of the driver
          
-uart:~$ wifiutils help
+`uart:~$ wifiutils help`
          
          Lists all commands with usage example(s)
 
