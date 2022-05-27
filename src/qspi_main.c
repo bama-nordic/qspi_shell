@@ -18,7 +18,7 @@
 #include "qspi_if.h"
 #include "spi_if.h"
 
-#define QSPI_IF          0  // 1-> QSPI IF, 0-> SPIM IF
+#define QSPI_IF          1  // 1-> QSPI IF, 0-> SPIM IF
 #define SHELIAK_SOC      1  // 0 for FPGA builds
 #define SLEEP_TIME_MS    2
 
@@ -41,7 +41,7 @@
     #define PIN_IRQ     24  //P0.24 on FPGA
 #endif
 
-#define SW_VER          "1.6"
+#define SW_VER          "1.6.1"
 
 const struct device *gpio_dev;
 static bool hl_flag;
@@ -81,17 +81,17 @@ static char blk_name[][15] = {
 };
 
 static uint32_t shk_memmap[][3] = {
-    {0x000000, 0x008FFF, 1},
-    {0x009000, 0x03FFFF, 2},
-    {0x040000, 0x07FFFF, 1},
+    {0x000000, 0x008FFF, 2},
+    {0x009000, 0x03FFFF, 3},
+    {0x040000, 0x07FFFF, 2},
     {0x0C0000, 0x0F0FFF, 0},
-    {0x080000, 0x092000, 1},
-    {0x100000, 0x134000, 1},
-    {0x140000, 0x14C000, 1},
-    {0x180000, 0x190000, 1},
-    {0x200000, 0x261800, 1},
-    {0x280000, 0x2A4000, 1},
-    {0x300000, 0x338000, 1}
+    {0x080000, 0x092000, 2},
+    {0x100000, 0x134000, 2},
+    {0x140000, 0x14C000, 2},
+    {0x180000, 0x190000, 2},
+    {0x200000, 0x261800, 2},
+    {0x280000, 0x2A4000, 2},
+    {0x300000, 0x338000, 2}
 };
 
 struct gpio_callback irq_callback_data;
@@ -99,6 +99,31 @@ struct gpio_callback irq_callback_data;
 void irq_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
     printk("\n !!! IRQ Hit !!!!\n");
 }
+
+static unsigned long zep_shim_time_get_curr_us(void)
+{
+    struct timeval curr_time;
+    unsigned long curr_time_us = 0;
+
+    gettimeofday(&curr_time, NULL);
+
+    curr_time_us = (curr_time.tv_sec * 1000 * 1000) + curr_time.tv_usec;
+
+    return curr_time_us;
+}
+
+static unsigned int zep_shim_time_elapsed_us(unsigned long start_time_us)
+{
+    struct timeval curr_time;
+    unsigned long curr_time_us = 0;
+
+    gettimeofday(&curr_time, NULL);
+
+    curr_time_us = (curr_time.tv_sec * 1000 * 1000) + curr_time.tv_usec;
+
+    return curr_time_us - start_time_us;
+}
+
 
 void print_memmap()
 {
@@ -346,6 +371,36 @@ static int cmd_memtest(const struct shell *shell, size_t argc, char **argv)
     return 0;
 }
 
+static int cmd_qspi_thpt(const struct shell *shell, size_t argc, char **argv)
+{
+    uint32_t addr, wrd_len;
+    long start,elapsed;
+    uint32_t *buff;
+
+    addr    = strtoul(argv[1], NULL, 0);
+    wrd_len = strtoul(argv[2], NULL, 0);
+
+    buff = (uint32_t *) k_malloc(wrd_len*4);
+
+    for (int i=0; i< wrd_len; i++) {
+        buff[i] =i;
+        //printk("%08x\n", buff[i]);
+    }
+
+    start = zep_shim_time_get_curr_us();
+    qdev->write(addr , buff, wrd_len*4); //write(addr, &data, len)
+    elapsed = zep_shim_time_elapsed_us(start);
+    shell_print(shell, "Write Stats: elapsed time = %ld us, Throughput = %f",elapsed, (double)4*8*wrd_len/elapsed);
+
+    start = zep_shim_time_get_curr_us();
+    qdev->read(addr, buff, wrd_len*4);
+    elapsed = zep_shim_time_elapsed_us(start);
+    shell_print(shell, "Read Stats: elapsed time = %ld us, Throughput = %f",elapsed, (double)4*8*wrd_len/elapsed);
+
+    k_free(buff);
+
+    return 0;
+}
 
 void get_sleep_stats(uint32_t addr, uint32_t *buff, uint32_t wrd_len)
 {
@@ -788,6 +843,9 @@ static void cmd_help(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "         QSPI/SPIM read latency for the selected block : 0-255"); 
     shell_print(shell, "         NOTE: need to do a wifi_off and wifi_on for these changes to take effect"); 
     shell_print(shell, "  "); 
+    shell_print(shell, "uart:~$ wifiutils qspi_thpt <addr> <wrd_len> ");
+    shell_print(shell, "         Displays QSPI read/write throughput w.r.t PKTRAM mem block "); 
+    shell_print(shell, "  "); 
     shell_print(shell, "uart:~$ wifiutils ver ");
     shell_print(shell, "         Display SW version and other details of the hex file "); 
     shell_print(shell, "  "); 
@@ -862,6 +920,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_wifiutils,
         SHELL_CMD(config,   NULL, "Runtime config of SCK, Freq and latency for QSPI/SPIM", cmd_config),
         SHELL_CMD(memmap,   NULL, "Gives the full memory map of the Sheliak chip", cmd_memmap),
         SHELL_CMD(memtest,  NULL, "Writes, reads back and validates specified memory on Seliak chip", cmd_memtest),
+        SHELL_CMD(qspi_thpt,  NULL, "Gives qspi read/write throughput", cmd_qspi_thpt),
         SHELL_CMD(ver,   NULL, "Display SW version of the hex file", cmd_ver),
         SHELL_CMD(help,   NULL, "Help with all supported commmands", cmd_help),
         SHELL_SUBCMD_SET_END
