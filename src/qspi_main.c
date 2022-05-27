@@ -380,6 +380,12 @@ static int cmd_qspi_thpt(const struct shell *shell, size_t argc, char **argv)
     addr    = strtoul(argv[1], NULL, 0);
     wrd_len = strtoul(argv[2], NULL, 0);
 
+    if (!validate_addr(addr, wrd_len*4)) return -1;
+
+    if ((selected_blk == LMAC_ROM) || (selected_blk == UMAC_ROM)) {
+        shell_print(shell, "Error... Cannot write to ROM blocks");
+    }
+
     buff = (uint32_t *) k_malloc(wrd_len*4);
 
     for (int i=0; i< wrd_len; i++) {
@@ -393,7 +399,7 @@ static int cmd_qspi_thpt(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "Write Stats: elapsed time = %ld us, Throughput = %f",elapsed, (double)4*8*wrd_len/elapsed);
 
     start = zep_shim_time_get_curr_us();
-    qdev->read(addr, buff, wrd_len*4);
+    (hl_flag)? qdev->hl_read(addr, buff, wrd_len*4) : qdev->read(addr, buff, wrd_len*4);
     elapsed = zep_shim_time_elapsed_us(start);
     shell_print(shell, "Read Stats: elapsed time = %ld us, Throughput = %f",elapsed, (double)4*8*wrd_len/elapsed);
 
