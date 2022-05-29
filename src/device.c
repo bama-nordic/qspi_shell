@@ -59,8 +59,8 @@ struct qspi_config *qspi_defconfig(void)
 	if (config.freq > 8) /* 16Mhz */
 		config.qspi_slave_latency = 1;
 
-	//config.encryption = config.CMD_CNONCE = false;
-	config.encryption = config.CMD_CNONCE = true;
+	config.encryption = config.CMD_CNONCE = false;
+	//config.encryption = config.CMD_CNONCE = true;
 
 #ifdef CONFIG_BOARD_NRF5340DK_NRF5340_CPUAPP
 

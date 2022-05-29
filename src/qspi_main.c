@@ -18,7 +18,7 @@
 #include "qspi_if.h"
 #include "spi_if.h"
 
-#define QSPI_IF          1  // 1-> QSPI IF, 0-> SPIM IF
+#define QSPI_IF          0  // 1-> QSPI IF, 0-> SPIM IF
 #define SHELIAK_SOC      1  // 0 for FPGA builds
 #define SLEEP_TIME_MS    2
 
@@ -41,11 +41,12 @@
     #define PIN_IRQ     24  //P0.24 on FPGA
 #endif
 
-#define SW_VER          "1.6.1"
+#define SW_VER          "1.6.2"
 
 const struct device *gpio_dev;
 static bool hl_flag;
 static int selected_blk;
+static int wifi_on_flag=0;
 
 extern struct qspi_config *qspi_config;
 const struct qspi_dev *qdev;
@@ -192,10 +193,23 @@ static int cmd_write_wrd(const struct shell *shell, size_t argc, char **argv)
     addr = strtoul(argv[1], NULL, 0);
     val =  strtoul(argv[2], NULL, 0);
 
+
+    if (wifi_on_flag == 0) {
+        shell_print(shell,"Err!! Please run wifi_on first");
+        return -1;
+    }
+
+    if (argc != 3) {
+        shell_print(shell,"incorrect arguments!!");
+        shell_print(shell,"$ wifiutils write_wrd <addr> <value>");
+        return -1;
+    }
+
     if (!validate_addr(addr, 1)) return -1;
 
     if ((selected_blk == LMAC_ROM) || (selected_blk == UMAC_ROM)) {
         shell_print(shell, "Error... Cannot write to ROM blocks");
+	return -1;
     }
 
     qdev->write(addr , &val, 4); //write(addr, &data, len)
@@ -219,6 +233,17 @@ static int cmd_write_blk(const struct shell *shell, size_t argc, char **argv)
     offset = strtoul(argv[3], NULL, 0);
     num_words = strtoul(argv[4], NULL, 0);
 
+    if (wifi_on_flag == 0) {
+        shell_print(shell,"Err!! Please run wifi_on first");
+        return -1;
+    }
+
+    if (argc != 5) {
+        shell_print(shell,"incorrect arguments!!");
+        shell_print(shell,"$ wifiutils write_blk <addr> <start_pattern> <pattern_incr> <num_words>");
+        return -1;
+    }
+
     if (num_words > 2000) {
         shell_print(shell, "Presently supporting block read/write only upto 2000 32-bit words");
         return -1;
@@ -228,6 +253,7 @@ static int cmd_write_blk(const struct shell *shell, size_t argc, char **argv)
 
     if ((selected_blk == LMAC_ROM) || (selected_blk == UMAC_ROM)) {
         shell_print(shell, "Error... Cannot write to ROM blocks");
+	return -1;
     }
 
     buff = (uint32_t *) k_malloc(num_words*4);
@@ -251,6 +277,18 @@ static int cmd_read_wrd(const struct shell *shell, size_t argc, char **argv)
     uint32_t addr;
 
     addr = strtoul(argv[1], NULL, 0);
+
+    if (wifi_on_flag == 0) {
+        shell_print(shell,"Err!! Please run wifi_on first");
+        return -1;
+    }
+
+    if (argc != 2) {
+        shell_print(shell,"incorrect arguments!!");
+        shell_print(shell,"$ wifiutils read_wrd <addr>");
+        return -1;
+    }
+
     if (!validate_addr(addr, 1)) return -1;
 
     //shell_print(shell, "hl_read = %d",(int) hl_flag);
@@ -274,6 +312,16 @@ static int cmd_read_blk(const struct shell *shell, size_t argc, char **argv)
 
     addr = strtoul(argv[1], NULL, 0);
     num_words = strtoul(argv[2], NULL, 0);
+
+    if (wifi_on_flag == 0) {
+        shell_print(shell,"Err!! Please run wifi_on first");
+        return -1;
+    }
+    if (argc != 3) {
+        shell_print(shell,"incorrect arguments!!");
+        shell_print(shell,"$ wifiutils read_blk <addr> <num_words>");
+    return -1;
+    }
     
     if (num_words > 2000) {
         shell_print(shell, "Presently supporting block read/write only upto 2000 32-bit words");
@@ -314,7 +362,6 @@ static int cmd_read_blk(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_memtest(const struct shell *shell, size_t argc, char **argv)
 {
-    // $write_blk 0xc0000 0xdeadbeef 16
     uint32_t pattern;
     uint32_t addr;
     uint32_t num_words;
@@ -327,10 +374,22 @@ static int cmd_memtest(const struct shell *shell, size_t argc, char **argv)
     offset = strtoul(argv[3], NULL, 0);
     num_words = strtoul(argv[4], NULL, 0);
 
+    if (wifi_on_flag == 0) {
+        shell_print(shell,"Err!! Please run wifi_on first");
+        return -1;
+    }
+
+    if (argc != 5) {
+        shell_print(shell,"incorrect arguments!!");
+        shell_print(shell,"$ wifiutils memtest <start_addr> <start_pattern> <pattern_incr> <num_words>");
+        return -1;
+    }
+
     if (!validate_addr(addr, num_words*4)) return -1;
 
     if ((selected_blk == LMAC_ROM) || (selected_blk == UMAC_ROM)) {
         shell_print(shell, "Error... Cannot write to ROM blocks");
+        return -1;
     }
 
     //printk("QSPI/SPIM latency = %d \n",cfg->qspi_slave_latency);
@@ -350,7 +409,9 @@ static int cmd_memtest(const struct shell *shell, size_t argc, char **argv)
             //printk("%08x\n", buff[i]);
         }
 
-        qdev->write(addr , buff, test_chunk*4); //write(addr, &data, len)
+    addr = addr+chunk_no*2000;
+
+        qdev->write(addr, buff, test_chunk*4); //write(addr, &data, len)
         //shell_print(shell, "Written 0x%08x to %d words starting from 0x%08x\n", pattern, num_words, addr);
 
         (hl_flag)? qdev->hl_read(addr, rxbuff, test_chunk*4) : qdev->read(addr, rxbuff, test_chunk*4);
@@ -380,10 +441,22 @@ static int cmd_qspi_thpt(const struct shell *shell, size_t argc, char **argv)
     addr    = strtoul(argv[1], NULL, 0);
     wrd_len = strtoul(argv[2], NULL, 0);
 
+    if (wifi_on_flag == 0) {
+        shell_print(shell,"Err!! Please run wifi_on first");
+        return -1;
+    }
+
+    if (argc != 3) {
+        shell_print(shell,"incorrect arguments!!");
+        shell_print(shell,"$ wifiutils qspi_thpt <start_addr> <num_words>");
+        return -1;
+    }
+
     if (!validate_addr(addr, wrd_len*4)) return -1;
 
     if ((selected_blk == LMAC_ROM) || (selected_blk == UMAC_ROM)) {
         shell_print(shell, "Error... Cannot write to ROM blocks");
+    return -1;
     }
 
     buff = (uint32_t *) k_malloc(wrd_len*4);
@@ -392,6 +465,8 @@ static int cmd_qspi_thpt(const struct shell *shell, size_t argc, char **argv)
         buff[i] =i;
         //printk("%08x\n", buff[i]);
     }
+
+    printk("hl_flag = %d\n", hl_flag);
 
     start = zep_shim_time_get_curr_us();
     qdev->write(addr , buff, wrd_len*4); //write(addr, &data, len)
@@ -449,10 +524,23 @@ static int cmd_sleep_stats(const struct shell *shell, size_t argc, char **argv)
     addr = strtoul(argv[1], NULL, 0);
     wrd_len = strtoul(argv[2], NULL, 0);
 
+    if (wifi_on_flag == 0) {
+        shell_print(shell,"Err!! Please run wifi_on first");
+        return -1;
+    }
+
+    if (argc != 3) {
+        shell_print(shell,"incorrect arguments!!");
+        shell_print(shell,"$ wifiutils sleep_stats <addr> <num_words>");
+        return -1;
+    }
+
+
     if (!validate_addr(addr, wrd_len*4)) return -1;
 
     if ((selected_blk == LMAC_ROM) || (selected_blk == UMAC_ROM)) {
         shell_print(shell, "Error... Cannot write to ROM blocks");
+        return -1;
     }
 
     buff = (uint32_t *) k_malloc(wrd_len*4);
@@ -552,32 +640,6 @@ static int cmd_pwron(const struct shell *shell, size_t argc, char **argv)
 //--------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------
 
-static int cmd_config(const struct shell *shell, size_t argc, char **argv)
-{
-    uint32_t qspi_spim_freq_MHz;
-    uint32_t qspi_spim_latency;
-    uint32_t mem_block;
-
-    // Re-initialize cfg
-    cfg = qspi_defconfig();
-
-    qspi_spim_freq_MHz = strtoul(argv[1], NULL, 0);
-    mem_block = strtoul(argv[2], NULL, 0);
-    qspi_spim_latency = strtoul(argv[3], NULL, 0);
-
-
-    cfg->freq = qspi_spim_freq_MHz;
-    shk_memmap[mem_block][2] = qspi_spim_latency;
-    cfg->qspi_slave_latency = qspi_spim_latency;
-    printk("QSPIM freq = %d MHz\n",cfg->freq);
-    printk("QSPIM latency = %d \n",cfg->qspi_slave_latency);
-
-    return 0;
-}
-
-//--------------------------------------------------------------------------------------
-//--------------------------------------------------------------------------------------
-
 static void func_qspi_init(void)
 {
 
@@ -597,6 +659,33 @@ static void func_qspi_init(void)
 static int cmd_qspi_init(const struct shell *shell, size_t argc, char **argv)
 {
     func_qspi_init();
+    return 0;
+}
+
+//--------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------
+
+static int cmd_config(const struct shell *shell, size_t argc, char **argv)
+{
+    uint32_t qspi_spim_freq_MHz;
+    uint32_t qspi_spim_latency;
+    uint32_t mem_block;
+
+    // Re-initialize cfg
+    cfg = qspi_defconfig();
+
+    qspi_spim_freq_MHz = strtoul(argv[1], NULL, 0);
+    mem_block = strtoul(argv[2], NULL, 0);
+    qspi_spim_latency = strtoul(argv[3], NULL, 0);
+ 
+
+    cfg->freq = qspi_spim_freq_MHz;
+    shk_memmap[mem_block][2] = qspi_spim_latency;
+    cfg->qspi_slave_latency = qspi_spim_latency;
+    func_qspi_init();
+    printk("QSPIM freq = %d MHz\n",cfg->freq);
+    printk("QSPIM latency = %d \n",cfg->qspi_slave_latency);
+
     return 0;
 }
 
@@ -655,6 +744,13 @@ static int cmd_wrsr2(const struct shell *shell, size_t argc, char **argv)
 {
     uint8_t data;
     data = strtoul(argv[1], NULL, 0) &0xff; //only LSByte
+
+    if (argc != 2) {
+        shell_print(shell,"incorrect arguments!!");
+        shell_print(shell,"$ wifiutils wrsr2 <data>");
+        return -1;
+    }
+
     func_wrsr2(data);
     return 0;
 
@@ -725,6 +821,8 @@ static void func_wifi_on()
     func_qspi_init();
     func_rpuwake();
     func_rpuclks_on();
+
+    wifi_on_flag = 1;
 }
 
 static int cmd_wifi_on(const struct shell *shell, size_t argc, char **argv)
@@ -739,6 +837,7 @@ static int cmd_wifi_on(const struct shell *shell, size_t argc, char **argv)
 static int cmd_wifi_off(const struct shell *shell, size_t argc, char **argv)
 {
 
+    wifi_on_flag = 0;
 #if SHELIAK_SOC
     gpio_pin_set(gpio_dev, PIN_IOVDD, 0); // IOVDD CNTRL = 0
     gpio_pin_set(gpio_dev, PIN_BUCKEN, 0); // BUCKEN = 0
@@ -843,12 +942,16 @@ static void cmd_help(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "uart:~$ wifiutils clrirq ");
     shell_print(shell, "         Clears host IRQ generated interrupt"); 
     shell_print(shell, "  "); 
+
+#if 0
     shell_print(shell, "uart:~$ wifiutils config  <qspi/spi Freq> <mem_block_num> <read_latency>");
     shell_print(shell, "         QSPI/SPI clock freq in MHz : 4/8/16 etc"); 
     shell_print(shell, "         block num as per memmap (starting from 0) : 0-10"); 
     shell_print(shell, "         QSPI/SPIM read latency for the selected block : 0-255"); 
     shell_print(shell, "         NOTE: need to do a wifi_off and wifi_on for these changes to take effect"); 
     shell_print(shell, "  "); 
+#endif
+
     shell_print(shell, "uart:~$ wifiutils qspi_thpt <addr> <wrd_len> ");
     shell_print(shell, "         Displays QSPI read/write throughput w.r.t PKTRAM mem block "); 
     shell_print(shell, "  "); 
@@ -938,6 +1041,7 @@ SHELL_CMD_REGISTER(wifiutils, &sub_wifiutils, "wifiutils commands", NULL);
 
 void main(void)
 {
+    wifi_on_flag = 0;
     cfg = qspi_defconfig();
     printk("QSPIM freq = %d MHz\n",cfg->freq);
     printk("QSPIM latency = %d \n",cfg->qspi_slave_latency);
