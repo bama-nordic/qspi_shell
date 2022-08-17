@@ -28,6 +28,8 @@ struct qspi_dev qspi = {
 	.hard_reset = hard_reset
 };
 
+#ifndef QSPI_IF
+
 struct qspi_dev spim = {
 	.init = spim_init,
 	.read = spim_read,
@@ -35,6 +37,7 @@ struct qspi_dev spim = {
 	.hl_read = spim_hl_read,
 	.hard_reset = hard_reset
 };
+#endif
 
 struct qspi_config *qspi_defconfig(void)
 {
@@ -76,8 +79,11 @@ struct qspi_config *qspi_defconfig(void)
 	return &config;
 }
 
-struct qspi_dev *qspi_dev(bool spim_flag)
+struct qspi_dev *qspi_dev()
 {
-	// spim_flag : 0 -> qspi, 1 -> spim
-	return (spim_flag)? &spim : &qspi;
+#ifdef QSPI_IF
+	return &qspi;
+#else
+	return &spim;
+#endif
 }

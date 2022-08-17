@@ -9,8 +9,10 @@ cmake_minimum_required(VERSION 3.13.1)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(hello_world)
 
+target_compile_definitions(app PRIVATE QSPI_IF)
+
 target_sources(app PRIVATE src/qspi_main.c)
 target_sources(app PRIVATE src/qspi_if.c)
-target_sources(app PRIVATE src/spi_if.c)
+#target_sources(app PRIVATE src/spi_if.c)
 target_sources(app PRIVATE src/interrupts.c)
 target_sources(app PRIVATE src/device.c)
