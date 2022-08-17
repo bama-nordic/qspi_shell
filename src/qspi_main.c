@@ -18,11 +18,10 @@
 #include "qspi_if.h"
 #include "spi_if.h"
 
-#define QSPI_IF          0  // 1-> QSPI IF, 0-> SPIM IF
 #define SHELIAK_SOC      1  // 0 for FPGA builds
 #define SLEEP_TIME_MS    2
 
-#if QSPI_IF
+#ifdef QSPI_IF
   #define PIN_BUCKEN      12  //P0.12
   #define PIN_IOVDD       31  //P0.31
 #else
@@ -32,7 +31,7 @@
 
 
 #if SHELIAK_SOC
-#if QSPI_IF
+#ifdef QSPI_IF
     #define PIN_IRQ     23  //P0.23 on DK
 #else
     #define PIN_IRQ      9  //P1.9 on EK
@@ -485,7 +484,7 @@ static int cmd_qspi_thpt(const struct shell *shell, size_t argc, char **argv)
 
 void get_sleep_stats(uint32_t addr, uint32_t *buff, uint32_t wrd_len)
 {
-#if QSPI_IF
+#ifdef QSPI_IF
     qspi_cmd_wakeup_rpu(&qspi_perip,0x1);
     printk("Waiting for RPU awake...\n");
 
@@ -562,7 +561,7 @@ static int func_gpio_config()
 
     int ret;
 
-#if QSPI_IF
+#ifdef QSPI_IF
     gpio_dev = device_get_binding("GPIO_0");
     if (gpio_dev == NULL) {
         return -1;
@@ -643,12 +642,7 @@ static int cmd_pwron(const struct shell *shell, size_t argc, char **argv)
 static void func_qspi_init(void)
 {
 
-#if QSPI_IF
-    qdev = qspi_dev(0); // QSPI dev
-#else
-    qdev = qspi_dev(1); // SPIM dev
-#endif
-
+    qdev = qspi_dev();
     qdev->init(cfg);
 
     printk("QSPI/SPIM freq = %d MHz\n",cfg->freq);
@@ -697,7 +691,7 @@ static int func_rpuwake(void)
 {
 
 #if SHELIAK_SOC
-#if QSPI_IF
+#ifdef QSPI_IF
     qspi_cmd_wakeup_rpu(&qspi_perip, 0x1);
     printk("exited qspi_cmd_wakeup_rpu()\n");
 
@@ -730,7 +724,7 @@ static int cmd_rpuwake(const struct shell *shell, size_t argc, char **argv)
 
 static int func_wrsr2(uint8_t data)
 {
-#if QSPI_IF
+#ifdef QSPI_IF
     qspi_cmd_wakeup_rpu(&qspi_perip,data);
 #else
     spim_cmd_rpu_wakeup_fn(spim_perip,data);
@@ -760,7 +754,7 @@ static int cmd_wrsr2(const struct shell *shell, size_t argc, char **argv)
 //--------------------------------------------------------------------------------------
 static int func_rdsr2(void)
 {
-#if QSPI_IF
+#ifdef QSPI_IF
     qspi_validate_rpu_wake_writecmd(&qspi_perip);
 #else
     spim_validate_rpu_awake_fn(spim_perip);
@@ -779,7 +773,7 @@ static int cmd_rdsr2(const struct shell *shell, size_t argc, char **argv)
 
 static int func_rdsr1(void)
 {
-#if QSPI_IF
+#ifdef QSPI_IF
     qspi_wait_while_rpu_awake(&qspi_perip);
 #else
     spim_wait_while_rpu_awake_fn(spim_perip);
@@ -884,7 +878,7 @@ static void cmd_help(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "         reads them back and validates them"); 
     shell_print(shell, "  "); 
     shell_print(shell, "uart:~$ wifiutils wifi_on  ");
-#if QSPI_IF
+#ifdef QSPI_IF
     shell_print(shell, "         - Configures all gpio pins "); 
     shell_print(shell, "         - Writes 1 to BUCKEN (P0.12), waits for 2ms and then writes 1 to IOVDD Control (P0.31) "); 
     shell_print(shell, "         - Initializes qspi interface and wakes up RPU"); 
@@ -897,7 +891,7 @@ static void cmd_help(const struct shell *shell, size_t argc, char **argv)
 #endif
     shell_print(shell, "  "); 
     shell_print(shell, "uart:~$ wifiutils wifi_off ");
-#if QSPI_IF
+#ifdef QSPI_IF
     shell_print(shell, "         This writes 0 to IOVDD Control (P0.31) and then writes 0 to BUCKEN Control (P0.12)"); 
 #else
     shell_print(shell, "         This writes 0 to IOVDD Control (P1.00) and then writes 0 to BUCKEN Control (P1.01)"); 
@@ -907,7 +901,7 @@ static void cmd_help(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "         This continuously does the RPU sleep/wake cycle and displays stats "); 
     shell_print(shell, "  "); 
     shell_print(shell, "uart:~$ wifiutils gpio_config ");
-#if QSPI_IF
+#ifdef QSPI_IF
     shell_print(shell, "         Configures BUCKEN(P0.12) as o/p, IOVDD control (P0.31) as output and HOST_IRQ (P0.23) as input"); 
     shell_print(shell, "         and interruptible with a ISR hooked to it"); 
 #else
@@ -967,7 +961,7 @@ static int cmd_ver(const struct shell *shell, size_t argc, char **argv)
 {
 
     shell_print(shell, "wifiutils Version: %s",SW_VER); 
-#if QSPI_IF
+#ifdef QSPI_IF
     shell_print(shell, "Build for QSPI interface on nRF7002 board"); 
 #else
     shell_print(shell, "Build for SPIM interface on nRF7002EK+nRF5340DK connected via arduino header"); 

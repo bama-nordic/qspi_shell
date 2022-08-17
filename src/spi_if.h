@@ -11,28 +11,6 @@
 
 /* SPIM driver config */
 
-#ifdef CONFIG_BOARD_NRF52840DK_NRF52840
-
-#define CONFIG_SPI_3_NRF_SPIM           1
-#define CONFIG_SPI_3_NRF_ORC            0xff
-#define CONFIG_SPI_3_NRF_RX_DELAY       2
-
-#elif CONFIG_BOARD_NRF5340DK_NRF5340_CPUAPP
-
-#define CONFIG_SPI_4_NRF_SPIM           1
-#define CONFIG_SPI_4_NRF_ORC            0xff
-#define CONFIG_SPI_4_NRF_RX_DELAY       2
-#define CONFIG_SPI_INIT_PRIORITY        70
-#define CONFIG_SPI_NRFX_RAM_BUFFER_SIZE 8
-
-#endif
-
-#define CONFIG_SPI_INIT_PRIORITY        70
-#define CONFIG_SPI_NRFX_RAM_BUFFER_SIZE 8
-
-#define QSPI_NODE DT_NODELABEL(qspi)
-#define QSPI_PROP_AT(prop, idx) DT_PROP_BY_IDX(QSPI_NODE, prop, idx)
-
 int spim_init(struct qspi_config *config);
 
 int spim_write(unsigned int addr, const void *data, int len);
@@ -41,12 +19,16 @@ int spim_read(unsigned int addr, void *data, int len);
 
 int spim_hl_read(unsigned int addr, void *data, int len);
 
-extern const struct device *spim_perip;
+int spim_cmd_rpu_wakeup_fn(uint32_t data);
 
-void spim_cmd_rpu_wakeup_fn(const struct device *spi_perip, uint32_t data);
+int spim_wait_while_rpu_awake(void);
 
-void spim_wait_while_rpu_awake_fn(const struct device *spi_perip);
+int spi_validate_rpu_wake_writecmd(void);
 
-void spim_validate_rpu_awake_fn(const struct device *spi_perip);
+int spim_cmd_sleep_rpu_fn(void);
 
-void spim_cmd_sleep_rpu_fn(const struct device *spi_perip);
+int spim_RDSR1(const struct device *dev, uint8_t *rdsr1);
+
+int spim_RDSR2(const struct device *dev, uint8_t *rdsr2);
+
+int spim_WRSR2(const struct device *dev, const uint8_t wrsr2);
