@@ -60,7 +60,6 @@ struct qspi_dev {
 	int (*write)(unsigned int addr, const void *data, int len);
 	int (*read)(unsigned int addr, void *data, int len);
 	int (*hl_read)(unsigned int addr, void *data, int len);
-	void (*hard_reset)(void);
 };
 
 int qspi_cmd_wakeup_rpu(const struct device *dev, uint8_t data);
@@ -75,17 +74,12 @@ int qspi_hl_read(unsigned int addr, void *data, int len);
 
 int qspi_deinit(void);
 
-void gpio_free_irq(int pin, struct gpio_callback *button_cb_data);
-
-int gpio_request_irq(int pin, struct gpio_callback *button_cb_data, void (*irq_handler)());
-
 struct qspi_config *qspi_defconfig(void);
 
 struct qspi_dev *qspi_dev(void);
 
 int qspi_cmd_sleep_rpu(const struct device *dev);
 
-void hard_reset(void);
 void get_sleep_stats(uint32_t addr, uint32_t *buff, uint32_t wrd_len);
 
 extern struct device qspi_perip;
