@@ -842,10 +842,10 @@ static int qspi_nor_write(const struct device *dev, int addr, const void *src, s
 		_qspi_wait_for_completion(dev, res);
 		int64_t t3 =k_uptime_ticks(); 
 		long elapsed = zep_shim_time_elapsed_us(start);
-/* 		if (size > 100) {
-			printk("Time spent qlen: %d: %lld-%lld, tput: %ld\n", size, k_ticks_to_us_ceil64(t2 - t1), k_ticks_to_us_ceil64(t3 - t2), (8*size)/k_ticks_to_us_ceil64(t3 - t2));
+		if (size > 100) {
+			printk("Time spent qlen: %d: %lld-%lld, tput: %lld\n", size, k_ticks_to_us_ceil64(t2 - t1), k_ticks_to_us_ceil64(t3 - t2), (8*size)/k_ticks_to_us_ceil64(t3 - t2));
 			printk("len: %d: tput %ld\n",size, 8*size/elapsed);
-		} */
+		}
 	}
 	qspi_unlock(dev);
 
